@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
-import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon } from 'lucide-react';
 import { Product, CartItem, PaymentMethod } from '../types';
 import { checkDrugInteractions } from '../services/geminiService';
+import { BRANCHES } from '../data/mockData';
 
 const MOCK_PRODUCTS: Product[] = [
   { id: '1', name: 'Panadol Extra', genericName: 'Paracetamol', category: 'Painkiller', price: 5000, unit: 'Strip', minStockLevel: 10, totalStock: 100, requiresPrescription: false, batches: [] },
@@ -11,12 +13,15 @@ const MOCK_PRODUCTS: Product[] = [
   { id: '5', name: 'Vitamin C + Zinc', genericName: 'Ascorbic Acid', category: 'Supplement', price: 8000, unit: 'Bottle', minStockLevel: 10, totalStock: 80, requiresPrescription: false, batches: [] },
 ];
 
-const POS: React.FC = () => {
+const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [interactionWarning, setInteractionWarning] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
+
+  const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
+  const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
 
   // Calculate totals
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -66,7 +71,7 @@ const POS: React.FC = () => {
 
   const handleCheckout = (method: PaymentMethod) => {
     setPaymentModalOpen(false);
-    setSuccessMsg(`Sale Completed! TRA Receipt #${Math.floor(Math.random() * 900000) + 100000} Generated.`);
+    setSuccessMsg(`Sale Completed at ${branchName}! TRA Receipt #${Math.floor(Math.random() * 900000) + 100000} Generated.`);
     setCart([]);
     setTimeout(() => setSuccessMsg(''), 5000);
   };
@@ -75,6 +80,20 @@ const POS: React.FC = () => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.genericName.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isHeadOffice) {
+      return (
+          <div className="flex flex-col items-center justify-center h-[60vh] text-center p-8 bg-white rounded-2xl shadow-sm border border-slate-100">
+              <div className="p-6 bg-amber-50 rounded-full mb-4">
+                  <AlertOctagon size={48} className="text-amber-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">POS Unavailable in Head Office View</h2>
+              <p className="text-slate-500 max-w-md mb-6">
+                  Point of Sale operations must be conducted within a specific branch context. Please switch to a branch using the selector in the sidebar to open the register.
+              </p>
+          </div>
+      )
+  }
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6">
@@ -124,7 +143,7 @@ const POS: React.FC = () => {
             <Printer className="mr-2" size={20}/>
             Current Sale
           </h2>
-          <p className="text-sm text-slate-500">Transaction ID: #TRX-{new Date().getTime().toString().slice(-6)}</p>
+          <p className="text-xs text-teal-600 font-bold mt-1">Location: {branchName}</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
