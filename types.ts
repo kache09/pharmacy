@@ -47,7 +47,8 @@ export interface Product {
   name: string;
   genericName: string;
   category: string; // e.g., Antibiotic, Analgesic
-  price: number;
+  costPrice: number; // Buying Price per unit
+  price: number; // Selling Price per unit
   unit: string; // e.g., Tablet, Bottle
   minStockLevel: number;
   batches: DrugBatch[];

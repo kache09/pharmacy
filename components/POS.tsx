@@ -6,11 +6,11 @@ import { checkDrugInteractions } from '../services/geminiService';
 import { BRANCHES } from '../data/mockData';
 
 const MOCK_PRODUCTS: Product[] = [
-  { id: '1', name: 'Panadol Extra', genericName: 'Paracetamol', category: 'Painkiller', price: 5000, unit: 'Strip', minStockLevel: 10, totalStock: 100, requiresPrescription: false, batches: [] },
-  { id: '2', name: 'Augmentin 625mg', genericName: 'Amoxicillin/Clavulanate', category: 'Antibiotic', price: 15000, unit: 'Box', minStockLevel: 5, totalStock: 40, requiresPrescription: true, batches: [] },
-  { id: '3', name: 'Azuma', genericName: 'Azithromycin', category: 'Antibiotic', price: 12000, unit: 'Box', minStockLevel: 5, totalStock: 30, requiresPrescription: true, batches: [] },
-  { id: '4', name: 'Cetirizine', genericName: 'Cetirizine', category: 'Antihistamine', price: 3000, unit: 'Strip', minStockLevel: 20, totalStock: 200, requiresPrescription: false, batches: [] },
-  { id: '5', name: 'Vitamin C + Zinc', genericName: 'Ascorbic Acid', category: 'Supplement', price: 8000, unit: 'Bottle', minStockLevel: 10, totalStock: 80, requiresPrescription: false, batches: [] },
+  { id: '1', name: 'Panadol Extra', genericName: 'Paracetamol', category: 'Painkiller', costPrice: 3500, price: 5000, unit: 'Strip', minStockLevel: 10, totalStock: 100, requiresPrescription: false, batches: [] },
+  { id: '2', name: 'Augmentin 625mg', genericName: 'Amoxicillin/Clavulanate', category: 'Antibiotic', costPrice: 11000, price: 15000, unit: 'Box', minStockLevel: 5, totalStock: 40, requiresPrescription: true, batches: [] },
+  { id: '3', name: 'Azuma', genericName: 'Azithromycin', category: 'Antibiotic', costPrice: 8500, price: 12000, unit: 'Box', minStockLevel: 5, totalStock: 30, requiresPrescription: true, batches: [] },
+  { id: '4', name: 'Cetirizine', genericName: 'Cetirizine', category: 'Antihistamine', costPrice: 1500, price: 3000, unit: 'Strip', minStockLevel: 20, totalStock: 200, requiresPrescription: false, batches: [] },
+  { id: '5', name: 'Vitamin C + Zinc', genericName: 'Ascorbic Acid', category: 'Supplement', costPrice: 5000, price: 8000, unit: 'Bottle', minStockLevel: 10, totalStock: 80, requiresPrescription: false, batches: [] },
 ];
 
 const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {

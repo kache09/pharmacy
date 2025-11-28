@@ -21,10 +21,10 @@ export const STAFF_LIST: Staff[] = [
 ];
 
 export const PRODUCTS: Product[] = [
-  { id: '1', name: 'Panadol Extra', genericName: 'Paracetamol', category: 'Painkiller', price: 5000, unit: 'Strip', minStockLevel: 50, totalStock: 0, requiresPrescription: false, batches: [] },
-  { id: '2', name: 'Augmentin 625mg', genericName: 'Amoxicillin/Clavulanate', category: 'Antibiotic', price: 15000, unit: 'Box', minStockLevel: 20, totalStock: 0, requiresPrescription: true, batches: [] },
-  { id: '3', name: 'Metformin 500mg', genericName: 'Metformin', category: 'Diabetes', price: 8000, unit: 'Box', minStockLevel: 10, totalStock: 0, requiresPrescription: true, batches: [] },
-  { id: '4', name: 'Cipro 500mg', genericName: 'Cipro', category: 'Antibiotic', price: 6000, unit: 'Box', minStockLevel: 15, totalStock: 0, requiresPrescription: true, batches: [] },
+  { id: '1', name: 'Panadol Extra', genericName: 'Paracetamol', category: 'Painkiller', costPrice: 3500, price: 5000, unit: 'Strip', minStockLevel: 50, totalStock: 0, requiresPrescription: false, batches: [] },
+  { id: '2', name: 'Augmentin 625mg', genericName: 'Amoxicillin/Clavulanate', category: 'Antibiotic', costPrice: 11000, price: 15000, unit: 'Box', minStockLevel: 20, totalStock: 0, requiresPrescription: true, batches: [] },
+  { id: '3', name: 'Metformin 500mg', genericName: 'Metformin', category: 'Diabetes', costPrice: 5500, price: 8000, unit: 'Box', minStockLevel: 10, totalStock: 0, requiresPrescription: true, batches: [] },
+  { id: '4', name: 'Cipro 500mg', genericName: 'Cipro', category: 'Antibiotic', costPrice: 4000, price: 6000, unit: 'Box', minStockLevel: 15, totalStock: 0, requiresPrescription: true, batches: [] },
 ];
 
 // Mapping stock per branch for logic simulation

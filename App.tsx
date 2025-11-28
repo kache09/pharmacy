@@ -9,6 +9,7 @@ import Branches from './components/Branches';
 import Staff from './components/Staff';
 import Clinical from './components/Clinical';
 import Reports from './components/Reports';
+import Settings from './components/Settings';
 import { BRANCHES } from './data/mockData';
 
 const App: React.FC = () => {
@@ -34,15 +35,7 @@ const App: React.FC = () => {
       case 'reports':
         return <Reports currentBranchId={currentBranchId} />;
       case 'settings':
-        return (
-          <div className="flex flex-col items-center justify-center h-96 text-center">
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">Coming Soon</h2>
-            <p className="text-slate-500 max-w-md">
-              The {activeTab} module includes features like System Configuration, 
-              Backup Management, and Global Preferences in the full version.
-            </p>
-          </div>
-        );
+        return <Settings currentBranchId={currentBranchId} />;
       default:
         return <Dashboard currentBranchId={currentBranchId} />;
     }
