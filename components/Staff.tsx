@@ -11,7 +11,10 @@ import {
   Phone,
   CheckCircle,
   XCircle,
-  User
+  User,
+  Edit,
+  ArrowRightLeft,
+  Save
 } from 'lucide-react';
 import { BRANCHES, STAFF_LIST } from '../data/mockData';
 import { Staff as StaffType, UserRole } from '../types';
@@ -19,7 +22,12 @@ import { Staff as StaffType, UserRole } from '../types';
 const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const [staff, setStaff] = useState<StaffType[]>(STAFF_LIST);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  
+  // Form States
   const [newStaff, setNewStaff] = useState<Partial<StaffType>>({
     name: '',
     role: UserRole.CASHIER,
@@ -28,6 +36,8 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
     phone: '',
     status: 'ACTIVE'
   });
+
+  const [editingStaff, setEditingStaff] = useState<StaffType | null>(null);
 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
@@ -66,6 +76,19 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
         phone: '',
         status: 'ACTIVE'
     });
+  };
+
+  const handleUpdateStaff = () => {
+      if (!editingStaff) return;
+      
+      setStaff(prev => prev.map(s => s.id === editingStaff.id ? editingStaff : s));
+      setShowEditModal(false);
+      setEditingStaff(null);
+  };
+
+  const openEditModal = (staffMember: StaffType) => {
+      setEditingStaff({ ...staffMember });
+      setShowEditModal(true);
   };
 
   const toggleStatus = (id: string) => {
@@ -142,9 +165,15 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                                   </span>
                               </div>
                           </div>
-                          <button className="text-slate-400 hover:text-slate-600">
-                              <MoreVertical size={20} />
-                          </button>
+                          {isHeadOffice && (
+                              <button 
+                                onClick={() => openEditModal(member)}
+                                className="text-slate-400 hover:text-teal-600 hover:bg-teal-50 p-2 rounded-full transition-colors"
+                                title="Edit & Transfer"
+                              >
+                                  <Edit size={18} />
+                              </button>
+                          )}
                       </div>
 
                       <div className="space-y-3 text-sm text-slate-600">
@@ -156,14 +185,12 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                               <Phone size={16} className="text-slate-400" />
                               <span>{member.phone || 'No Phone'}</span>
                           </div>
-                          {isHeadOffice && (
-                            <div className="flex items-center gap-3">
-                                <MapPin size={16} className="text-slate-400" />
-                                <span className="text-teal-700 font-medium">
-                                    {BRANCHES.find(b => b.id === member.branchId)?.name}
-                                </span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-3">
+                              <MapPin size={16} className="text-slate-400" />
+                              <span className="text-teal-700 font-medium">
+                                  {BRANCHES.find(b => b.id === member.branchId)?.name || 'Unknown Branch'}
+                              </span>
+                          </div>
                       </div>
                   </div>
                   
@@ -179,7 +206,7 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                               </span>
                           )}
                           <span className="text-slate-400 mx-2">|</span>
-                          <span className="text-slate-500">Login: {member.lastLogin}</span>
+                          <span className="text-slate-500">Joined: {member.joinedDate}</span>
                       </div>
                       <button 
                         onClick={() => toggleStatus(member.id)}
@@ -291,6 +318,103 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                <div className="p-6 bg-slate-50 flex justify-end gap-3">
                   <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
                   <button onClick={handleAddStaff} className="px-4 py-2 bg-teal-600 text-white font-medium hover:bg-teal-700 rounded-lg shadow-sm">Create User</button>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* Edit Staff Modal */}
+      {showEditModal && editingStaff && (
+         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+               <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Edit Staff Details</h3>
+                    <p className="text-slate-500 text-sm">Update role, branch assignment, or contact info.</p>
+                  </div>
+                  <div className="p-2 bg-slate-100 rounded-full">
+                      <Edit size={20} className="text-slate-500" />
+                  </div>
+               </div>
+               
+               <div className="p-6 space-y-4">
+                   {/* Name & Contact */}
+                   <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none" 
+                            value={editingStaff.name}
+                            onChange={(e) => setEditingStaff({...editingStaff, name: e.target.value})}
+                        />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                        <div>
+                             <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+                             <input 
+                                type="email" 
+                                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-sm" 
+                                value={editingStaff.email}
+                                onChange={(e) => setEditingStaff({...editingStaff, email: e.target.value})}
+                             />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-bold text-slate-700 mb-1">Phone</label>
+                             <input 
+                                type="tel" 
+                                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-sm" 
+                                value={editingStaff.phone}
+                                onChange={(e) => setEditingStaff({...editingStaff, phone: e.target.value})}
+                             />
+                        </div>
+                   </div>
+
+                   <hr className="border-slate-100 my-2" />
+                   
+                   {/* Role & Branch Transfer */}
+                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2">
+                               <Shield size={14} /> System Role
+                           </label>
+                           <select 
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                value={editingStaff.role}
+                                onChange={(e) => setEditingStaff({...editingStaff, role: e.target.value as UserRole})}
+                            >
+                                {Object.values(UserRole).map(role => (
+                                    <option key={role} value={role}>{role.replace('_', ' ')}</option>
+                                ))}
+                            </select>
+                       </div>
+
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2">
+                               <ArrowRightLeft size={14} /> Branch Assignment (Transfer)
+                           </label>
+                           <select 
+                                className="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                value={editingStaff.branchId}
+                                onChange={(e) => setEditingStaff({...editingStaff, branchId: e.target.value})}
+                            >
+                                {BRANCHES.map(b => (
+                                    <option key={b.id} value={b.id}>{b.name} ({b.location})</option>
+                                ))}
+                            </select>
+                            {editingStaff.branchId !== staff.find(s => s.id === editingStaff.id)?.branchId && (
+                                <p className="text-xs text-amber-600 mt-2 flex items-center gap-1 font-medium">
+                                    <ArrowRightLeft size={12} /> Staff will be transferred upon saving.
+                                </p>
+                            )}
+                       </div>
+                   </div>
+               </div>
+
+               <div className="p-6 bg-slate-50 flex justify-end gap-3">
+                  <button onClick={() => setShowEditModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
+                  <button onClick={handleUpdateStaff} className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-sm flex items-center gap-2">
+                      <Save size={18} /> Save Changes
+                  </button>
                </div>
             </div>
          </div>
