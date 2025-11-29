@@ -34,6 +34,8 @@ export interface Staff {
   status: 'ACTIVE' | 'INACTIVE';
   lastLogin?: string;
   joinedDate: string;
+  username: string; // Added for Auth
+  password?: string; // Added for Auth (Mock only - in real app this is hashed)
 }
 
 export interface DrugBatch {
@@ -98,6 +100,9 @@ export interface StockTransfer {
   items: TransferItem[];
   status: TransferStatus;
   notes?: string;
+  // Security Keys for Verification Steps
+  keeperCode?: string; // Code for Store Keeper to confirm receipt
+  controllerCode?: string; // Code for Inventory Controller to verify
   workflow: {
     step: 'INITIATED' | 'KEEPER_CHECK' | 'CONTROLLER_VERIFY' | 'DONE';
     logs: {

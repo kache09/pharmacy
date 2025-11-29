@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
+import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import POS from './components/POS';
 import Inventory from './components/Inventory';
@@ -10,11 +11,37 @@ import Staff from './components/Staff';
 import Clinical from './components/Clinical';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
-import { BRANCHES } from './data/mockData';
+import { Staff as StaffType, UserRole } from './types';
 
 const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<StaffType | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentBranchId, setCurrentBranchId] = useState('HEAD_OFFICE');
+
+  // Handle Login
+  const handleLogin = (user: StaffType) => {
+    setCurrentUser(user);
+    // Determine initial branch context
+    if (user.role === UserRole.SUPER_ADMIN) {
+        setCurrentBranchId('HEAD_OFFICE');
+    } else {
+        setCurrentBranchId(user.branchId);
+    }
+    // Set default active tab based on role
+    if (user.role === UserRole.CASHIER) setActiveTab('pos');
+    else if (user.role === UserRole.PHARMACIST) setActiveTab('clinical');
+    else setActiveTab('dashboard');
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveTab('dashboard');
+  };
+
+  // If not logged in, show Login Screen
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -47,6 +74,8 @@ const App: React.FC = () => {
       setActiveTab={setActiveTab}
       currentBranchId={currentBranchId}
       setCurrentBranchId={setCurrentBranchId}
+      currentUser={currentUser}
+      onLogout={handleLogout}
     >
       {renderContent()}
     </Layout>

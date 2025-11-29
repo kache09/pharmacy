@@ -14,7 +14,10 @@ import {
   User,
   Edit,
   ArrowRightLeft,
-  Save
+  Save,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { BRANCHES, STAFF_LIST } from '../data/mockData';
 import { Staff as StaffType, UserRole } from '../types';
@@ -26,6 +29,7 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   // Form States
   const [newStaff, setNewStaff] = useState<Partial<StaffType>>({
@@ -34,7 +38,9 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
     branchId: currentBranchId === 'HEAD_OFFICE' ? 'BR001' : currentBranchId,
     email: '',
     phone: '',
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    username: '',
+    password: ''
   });
 
   const [editingStaff, setEditingStaff] = useState<StaffType | null>(null);
@@ -52,7 +58,7 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   });
 
   const handleAddStaff = () => {
-    if(!newStaff.name || !newStaff.email) return;
+    if(!newStaff.name || !newStaff.email || !newStaff.username || !newStaff.password) return;
 
     const staffMember: StaffType = {
         id: `ST-${Math.floor(Math.random() * 9000) + 1000}`,
@@ -63,7 +69,9 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
         phone: newStaff.phone || '',
         status: 'ACTIVE',
         joinedDate: new Date().toISOString().split('T')[0],
-        lastLogin: 'Never'
+        lastLogin: 'Never',
+        username: newStaff.username!,
+        password: newStaff.password!
     };
 
     setStaff([staffMember, ...staff]);
@@ -74,7 +82,9 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
         branchId: currentBranchId === 'HEAD_OFFICE' ? 'BR001' : currentBranchId,
         email: '',
         phone: '',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        username: '',
+        password: ''
     });
   };
 
@@ -106,6 +116,12 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
           case UserRole.ACCOUNTANT: return 'bg-amber-100 text-amber-700';
           default: return 'bg-slate-100 text-slate-700';
       }
+  };
+
+  // Helper to generate a suggested username
+  const generateUsername = (name: string) => {
+    if(!name) return '';
+    return name.toLowerCase().replace(/\s+/g, '').slice(0, 8) + Math.floor(Math.random() * 100);
   };
 
   return (
@@ -178,6 +194,10 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
 
                       <div className="space-y-3 text-sm text-slate-600">
                           <div className="flex items-center gap-3">
+                              <User size={16} className="text-slate-400" />
+                              <span className="truncate text-slate-500">@{member.username}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
                               <Mail size={16} className="text-slate-400" />
                               <span className="truncate">{member.email}</span>
                           </div>
@@ -233,10 +253,10 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
       {/* Add Staff Modal */}
       {showAddModal && (
          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
                <div className="p-6 border-b border-slate-100">
                   <h3 className="text-xl font-bold text-slate-900">Add Team Member</h3>
-                  <p className="text-slate-500 text-sm">Create a new account for an employee.</p>
+                  <p className="text-slate-500 text-sm">Create a new account & credentials for an employee.</p>
                </div>
                <div className="p-6 space-y-4">
                   <div>
@@ -248,7 +268,13 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                             className="w-full pl-9 p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" 
                             placeholder="John Doe" 
                             value={newStaff.name}
-                            onChange={(e) => setNewStaff({...newStaff, name: e.target.value})}
+                            onChange={(e) => {
+                                setNewStaff({
+                                    ...newStaff, 
+                                    name: e.target.value,
+                                    username: generateUsername(e.target.value)
+                                })
+                            }}
                         />
                     </div>
                   </div>
@@ -314,6 +340,45 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                         />
                     </div>
                   </div>
+
+                  <hr className="border-slate-100" />
+                  
+                  {/* Credentials Section */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                          <Lock size={16} className="text-teal-600" /> Login Credentials
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Username</label>
+                               <input 
+                                 type="text" 
+                                 className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white"
+                                 value={newStaff.username}
+                                 onChange={(e) => setNewStaff({...newStaff, username: e.target.value})}
+                               />
+                          </div>
+                          <div>
+                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                               <div className="relative">
+                                   <input 
+                                     type={showPassword ? "text" : "password"}
+                                     className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white pr-8"
+                                     value={newStaff.password}
+                                     onChange={(e) => setNewStaff({...newStaff, password: e.target.value})}
+                                   />
+                                   <button 
+                                     className="absolute right-2 top-2 text-slate-400 hover:text-teal-600"
+                                     onClick={() => setShowPassword(!showPassword)}
+                                     type="button"
+                                   >
+                                       {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                   </button>
+                               </div>
+                          </div>
+                      </div>
+                  </div>
+
                </div>
                <div className="p-6 bg-slate-50 flex justify-end gap-3">
                   <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
@@ -407,6 +472,18 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                                 </p>
                             )}
                        </div>
+                   </div>
+
+                   {/* Password Reset (Optional - Simplified) */}
+                   <div className="mt-4">
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Reset Password</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border border-slate-300 rounded-lg text-sm" 
+                            placeholder="Enter new password to reset..."
+                            value={editingStaff.password || ''}
+                            onChange={(e) => setEditingStaff({...editingStaff, password: e.target.value})}
+                        />
                    </div>
                </div>
 

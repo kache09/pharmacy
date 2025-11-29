@@ -18,7 +18,11 @@ import {
   X,
   Save,
   Search,
-  Filter
+  Filter,
+  ShieldCheck,
+  KeyRound,
+  Send,
+  Trash2
 } from 'lucide-react';
 import { BRANCHES, PRODUCTS, BRANCH_INVENTORY, STOCK_TRANSFERS } from '../data/mockData';
 import { StockTransfer, Product } from '../types';
@@ -34,7 +38,15 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  // Verification Modal State
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyStep, setVerifyStep] = useState<'KEEPER' | 'CONTROLLER'>('KEEPER');
+  const [activeTransferId, setActiveTransferId] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifyError, setVerifyError] = useState('');
 
   // Form States
   const [newStock, setNewStock] = useState({
@@ -55,6 +67,23 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
     reason: 'Restock',
     quantity: '',
     type: 'ADD' // ADD or REMOVE
+  });
+
+  // Shipment Form State
+  const [newShipment, setNewShipment] = useState<{
+      targetBranchId: string;
+      notes: string;
+      items: any[];
+  }>({
+      targetBranchId: '',
+      notes: '',
+      items: []
+  });
+  const [shipmentItem, setShipmentItem] = useState({
+      productId: '',
+      batchNumber: '',
+      expiryDate: '',
+      quantity: ''
   });
   
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
@@ -205,6 +234,36 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
   };
 
   // Workflow Handlers
+  const initiateVerification = (id: string, step: 'KEEPER' | 'CONTROLLER') => {
+      setActiveTransferId(id);
+      setVerifyStep(step);
+      setVerificationCode('');
+      setVerifyError('');
+      setShowVerifyModal(true);
+  };
+
+  const submitVerification = () => {
+      if (!activeTransferId) return;
+      const transfer = transfers.find(t => t.id === activeTransferId);
+      if (!transfer) return;
+
+      // Validate Code
+      const requiredCode = verifyStep === 'KEEPER' ? transfer.keeperCode : transfer.controllerCode;
+      
+      if (verificationCode !== requiredCode) {
+          setVerifyError('Invalid Verification Key. Please contact Head Office.');
+          return;
+      }
+
+      // Proceed if valid
+      if (verifyStep === 'KEEPER') {
+          handleKeeperConfirm(activeTransferId);
+      } else {
+          handleControllerVerify(activeTransferId);
+      }
+      setShowVerifyModal(false);
+  };
+
   const handleKeeperConfirm = (id: string) => {
     setTransfers(prev => prev.map(t => {
       if (t.id === id) {
@@ -213,7 +272,7 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
           status: 'RECEIVED_KEEPER',
           workflow: {
             step: 'CONTROLLER_VERIFY',
-            logs: [...t.workflow.logs, { role: 'Store Keeper', action: 'Confirmed Receipt', timestamp: new Date().toLocaleString(), user: 'Current User' }]
+            logs: [...t.workflow.logs, { role: 'Store Keeper', action: 'Confirmed Receipt (Secure)', timestamp: new Date().toLocaleString(), user: 'Current User' }]
           }
         } as StockTransfer;
       }
@@ -229,12 +288,62 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
           status: 'COMPLETED',
           workflow: {
             step: 'DONE',
-            logs: [...t.workflow.logs, { role: 'Inventory Controller', action: 'Verified & Stocked', timestamp: new Date().toLocaleString(), user: 'Current User' }]
+            logs: [...t.workflow.logs, { role: 'Inventory Controller', action: 'Verified & Stocked (Secure)', timestamp: new Date().toLocaleString(), user: 'Current User' }]
           }
         } as StockTransfer;
       }
       return t;
     }));
+  };
+
+  // Shipment Helpers
+  const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+  const addShipmentItem = () => {
+      if(!shipmentItem.productId || !shipmentItem.quantity) return;
+      const product = products.find(p => p.id === shipmentItem.productId);
+      if(!product) return;
+
+      setNewShipment(prev => ({
+          ...prev,
+          items: [...prev.items, {
+              productId: product.id,
+              productName: product.name,
+              batchNumber: shipmentItem.batchNumber || 'BATCH-NEW',
+              expiryDate: shipmentItem.expiryDate || new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+              quantity: parseInt(shipmentItem.quantity)
+          }]
+      }));
+      setShipmentItem({ productId: '', batchNumber: '', expiryDate: '', quantity: '' });
+  };
+
+  const removeShipmentItem = (idx: number) => {
+      setNewShipment(prev => ({
+          ...prev,
+          items: prev.items.filter((_, i) => i !== idx)
+      }));
+  };
+
+  const handleDispatchShipment = () => {
+      const transfer: StockTransfer = {
+          id: `TR-${Date.now().toString().slice(-6)}`,
+          sourceBranchId: 'HEAD_OFFICE',
+          targetBranchId: newShipment.targetBranchId,
+          dateSent: new Date().toISOString().split('T')[0],
+          items: newShipment.items,
+          status: 'IN_TRANSIT',
+          keeperCode: generateCode(),
+          controllerCode: generateCode(),
+          notes: newShipment.notes,
+          workflow: {
+              step: 'KEEPER_CHECK',
+              logs: [{ role: 'Head Office', action: 'Shipment Created & Dispatched', timestamp: new Date().toLocaleString(), user: 'Super Admin' }]
+          }
+      };
+
+      setTransfers([transfer, ...transfers]);
+      setShowTransferModal(false);
+      setNewShipment({ targetBranchId: '', notes: '', items: [] });
   };
 
   return (
@@ -249,6 +358,14 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
           </div>
         </div>
         <div className="flex gap-2">
+            {isHeadOffice && (
+                <button 
+                  onClick={() => setShowTransferModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-md shadow-blue-600/20"
+                >
+                    <Send size={16} /> New Shipment
+                </button>
+            )}
             <button 
                 onClick={() => { resetForm(); setShowAddModal(true); }}
                 className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-bold text-sm shadow-md shadow-teal-600/20"
@@ -422,6 +539,14 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                      <Truck size={48} className="mx-auto text-slate-300 mb-4" />
                      <h3 className="text-lg font-bold text-slate-700">No Transfers Found</h3>
                      <p className="text-slate-500">There are no incoming or outgoing stock transfers for this branch.</p>
+                     {isHeadOffice && (
+                        <button 
+                            onClick={() => setShowTransferModal(true)}
+                            className="mt-4 text-blue-600 font-bold hover:underline"
+                        >
+                            Create First Shipment
+                        </button>
+                     )}
                  </div>
              ) : (
                  branchTransfers.map(transfer => {
@@ -456,7 +581,7 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                                  <div className="flex items-center gap-3">
                                      {!isHeadOffice && isReadyForKeeper && (
                                          <button 
-                                            onClick={() => handleKeeperConfirm(transfer.id)}
+                                            onClick={() => initiateVerification(transfer.id, 'KEEPER')}
                                             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-600/20 transition-all"
                                          >
                                              <Package size={18} />
@@ -469,7 +594,7 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                                      
                                      {!isHeadOffice && isReadyForController && (
                                          <button 
-                                            onClick={() => handleControllerVerify(transfer.id)}
+                                            onClick={() => initiateVerification(transfer.id, 'CONTROLLER')}
                                             className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold shadow-lg shadow-teal-600/20 transition-all"
                                          >
                                              <ClipboardCheck size={18} />
@@ -481,6 +606,28 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                                      )}
                                  </div>
                              </div>
+                             
+                             {/* Head Office View of Verification Codes */}
+                             {isHeadOffice && !isComplete && (
+                                 <div className="px-6 py-2 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+                                      <div className="flex items-center gap-2 text-sm text-amber-800">
+                                          <ShieldCheck size={16} />
+                                          <span className="font-bold">Security Codes (Admin View):</span> 
+                                          <span>Share these with branch staff to authorize receipt.</span>
+                                      </div>
+                                      <div className="flex gap-4">
+                                          <div className="text-xs">
+                                              <span className="text-amber-600 uppercase font-bold mr-1">Keeper Code:</span>
+                                              <code className="bg-white px-2 py-1 rounded border border-amber-200 font-mono font-bold text-amber-900">{transfer.keeperCode}</code>
+                                          </div>
+                                          <div className="text-xs">
+                                              <span className="text-amber-600 uppercase font-bold mr-1">Controller Code:</span>
+                                              <code className="bg-white px-2 py-1 rounded border border-amber-200 font-mono font-bold text-amber-900">{transfer.controllerCode}</code>
+                                          </div>
+                                      </div>
+                                 </div>
+                             )}
+
                              <div className="p-6">
                                  <h4 className="text-sm font-bold text-slate-500 uppercase mb-4">Items in Shipment</h4>
                                  <table className="w-full text-left text-sm">
@@ -702,6 +849,198 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                   </div>
                </div>
            </div>
+      )}
+
+      {/* Shipment Modal */}
+      {showTransferModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <div>
+                          <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                             <Truck className="text-blue-600" /> Initiate Stock Transfer
+                          </h3>
+                          <p className="text-slate-500 text-sm">Send stock from Head Office to a Branch</p>
+                      </div>
+                      <button onClick={() => setShowTransferModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                      {/* Branch Selection */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Destination Branch</label>
+                          <select 
+                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={newShipment.targetBranchId}
+                            onChange={(e) => setNewShipment({...newShipment, targetBranchId: e.target.value})}
+                          >
+                              <option value="">-- Select Target Branch --</option>
+                              {BRANCHES.filter(b => b.id !== 'HEAD_OFFICE' && b.status === 'ACTIVE').map(b => (
+                                  <option key={b.id} value={b.id}>{b.name} ({b.location})</option>
+                              ))}
+                          </select>
+                      </div>
+
+                      {/* Add Items Section */}
+                      <div>
+                          <h4 className="font-bold text-slate-800 text-sm mb-3">Add Items to Shipment</h4>
+                          <div className="grid grid-cols-12 gap-3 mb-3">
+                              <div className="col-span-4">
+                                  <select 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                    value={shipmentItem.productId}
+                                    onChange={(e) => setShipmentItem({...shipmentItem, productId: e.target.value})}
+                                  >
+                                      <option value="">Product...</option>
+                                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  </select>
+                              </div>
+                              <div className="col-span-3">
+                                  <input 
+                                    type="text" 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm font-mono" 
+                                    placeholder="Batch No."
+                                    value={shipmentItem.batchNumber}
+                                    onChange={(e) => setShipmentItem({...shipmentItem, batchNumber: e.target.value})}
+                                  />
+                              </div>
+                              <div className="col-span-3">
+                                  <input 
+                                    type="date" 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                    value={shipmentItem.expiryDate}
+                                    onChange={(e) => setShipmentItem({...shipmentItem, expiryDate: e.target.value})}
+                                  />
+                              </div>
+                              <div className="col-span-2 flex items-center gap-2">
+                                  <input 
+                                    type="number" 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm" 
+                                    placeholder="Qty"
+                                    value={shipmentItem.quantity}
+                                    onChange={(e) => setShipmentItem({...shipmentItem, quantity: e.target.value})}
+                                  />
+                                  <button 
+                                    onClick={addShipmentItem}
+                                    className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                  >
+                                      <Plus size={16} />
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Items List */}
+                      {newShipment.items.length > 0 ? (
+                          <div className="border border-slate-200 rounded-xl overflow-hidden">
+                              <table className="w-full text-left text-sm">
+                                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                                      <tr>
+                                          <th className="px-4 py-2">Product</th>
+                                          <th className="px-4 py-2">Batch</th>
+                                          <th className="px-4 py-2">Qty</th>
+                                          <th className="px-4 py-2 w-10"></th>
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                      {newShipment.items.map((item, idx) => (
+                                          <tr key={idx} className="bg-white">
+                                              <td className="px-4 py-2 font-medium">{item.productName}</td>
+                                              <td className="px-4 py-2 font-mono text-slate-500">{item.batchNumber}</td>
+                                              <td className="px-4 py-2 font-bold">{item.quantity}</td>
+                                              <td className="px-4 py-2">
+                                                  <button onClick={() => removeShipmentItem(idx)} className="text-rose-500 hover:text-rose-700">
+                                                      <Trash2 size={16} />
+                                                  </button>
+                                              </td>
+                                          </tr>
+                                      ))}
+                                  </tbody>
+                              </table>
+                          </div>
+                      ) : (
+                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">
+                              No items added to shipment yet.
+                          </div>
+                      )}
+
+                      {/* Notes */}
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Shipment Notes</label>
+                          <textarea 
+                             className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                             rows={2}
+                             placeholder="Optional notes for receiver..."
+                             value={newShipment.notes}
+                             onChange={(e) => setNewShipment({...newShipment, notes: e.target.value})}
+                          ></textarea>
+                      </div>
+                  </div>
+
+                  <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                      <button onClick={() => setShowTransferModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
+                      <button 
+                        onClick={handleDispatchShipment}
+                        disabled={!newShipment.targetBranchId || newShipment.items.length === 0}
+                        className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                          <Send size={18} /> Dispatch Shipment
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Verification Modal (OTP) */}
+      {showVerifyModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                   <div className="p-6 border-b border-slate-100 text-center">
+                       <div className="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                           <KeyRound className="text-teal-600" size={24} />
+                       </div>
+                       <h3 className="text-lg font-bold text-slate-900">Security Verification</h3>
+                       <p className="text-slate-500 text-xs mt-1">
+                           Enter the 6-digit verification code sent by Head Office to {verifyStep === 'KEEPER' ? 'Store Keeper' : 'Inventory Controller'}.
+                       </p>
+                   </div>
+                   
+                   <div className="p-6 space-y-4">
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1 text-center">Verification Code</label>
+                           <input 
+                               type="text" 
+                               autoFocus
+                               maxLength={6}
+                               className="w-full p-4 border border-slate-300 rounded-xl text-2xl font-mono text-center tracking-widest focus:ring-2 focus:ring-teal-500 outline-none" 
+                               placeholder="000000"
+                               value={verificationCode}
+                               onChange={(e) => {
+                                   setVerifyError('');
+                                   setVerificationCode(e.target.value.replace(/[^0-9]/g, ''));
+                               }}
+                           />
+                       </div>
+                       
+                       {verifyError && (
+                           <div className="p-3 bg-rose-50 text-rose-600 text-xs rounded-lg text-center flex items-center justify-center gap-2">
+                               <AlertTriangle size={14} /> {verifyError}
+                           </div>
+                       )}
+                   </div>
+
+                   <div className="p-4 border-t border-slate-100 flex justify-between gap-3 bg-slate-50">
+                       <button onClick={() => setShowVerifyModal(false)} className="px-4 py-2 text-slate-500 hover:text-slate-700 font-medium text-sm">Cancel</button>
+                       <button 
+                           onClick={submitVerification}
+                           disabled={verificationCode.length !== 6}
+                           className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-lg shadow-teal-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                       >
+                           Verify & Proceed
+                       </button>
+                   </div>
+              </div>
+          </div>
       )}
     </div>
   );

@@ -10,14 +10,14 @@ export const BRANCHES: Branch[] = [
 ];
 
 export const STAFF_LIST: Staff[] = [
-  { id: 'ST-001', name: 'Dr. Amani', role: UserRole.SUPER_ADMIN, branchId: 'HEAD_OFFICE', email: 'amani@afyatrack.co.tz', phone: '+255 700 000 001', status: 'ACTIVE', joinedDate: '2022-01-01', lastLogin: 'Just now' },
-  { id: 'ST-002', name: 'Juma M', role: UserRole.BRANCH_MANAGER, branchId: 'BR001', email: 'juma@afyatrack.co.tz', phone: '+255 712 345 678', status: 'ACTIVE', joinedDate: '2022-03-15', lastLogin: '2 hrs ago' },
-  { id: 'ST-003', name: 'Sarah K', role: UserRole.PHARMACIST, branchId: 'BR002', email: 'sarah@afyatrack.co.tz', phone: '+255 755 123 456', status: 'ACTIVE', joinedDate: '2022-06-10', lastLogin: '5 hrs ago' },
-  { id: 'ST-004', name: 'David L', role: UserRole.INVENTORY_CONTROLLER, branchId: 'HEAD_OFFICE', email: 'david@afyatrack.co.tz', phone: '+255 655 987 654', status: 'ACTIVE', joinedDate: '2023-01-20', lastLogin: '1 day ago' },
-  { id: 'ST-005', name: 'Grace P', role: UserRole.CASHIER, branchId: 'BR001', email: 'grace@afyatrack.co.tz', phone: '+255 688 111 222', status: 'ACTIVE', joinedDate: '2023-05-12', lastLogin: '10 mins ago' },
-  { id: 'ST-006', name: 'Hassan A', role: UserRole.ACCOUNTANT, branchId: 'HEAD_OFFICE', email: 'hassan@afyatrack.co.tz', phone: '+255 777 333 444', status: 'ACTIVE', joinedDate: '2023-02-01', lastLogin: '3 days ago' },
-  { id: 'ST-007', name: 'Rehema P', role: UserRole.BRANCH_MANAGER, branchId: 'BR004', email: 'rehema@afyatrack.co.tz', phone: '+255 713 555 666', status: 'ACTIVE', joinedDate: '2023-08-01', lastLogin: '1 hr ago' },
-  { id: 'ST-008', name: 'John D', role: UserRole.PHARMACIST, branchId: 'BR001', email: 'john@afyatrack.co.tz', phone: '+255 766 888 999', status: 'INACTIVE', joinedDate: '2022-11-15', lastLogin: '2 weeks ago' },
+  { id: 'ST-001', name: 'Dr. Amani', role: UserRole.SUPER_ADMIN, branchId: 'HEAD_OFFICE', email: 'amani@afyatrack.co.tz', phone: '+255 700 000 001', status: 'ACTIVE', joinedDate: '2022-01-01', lastLogin: 'Just now', username: 'admin', password: '123' },
+  { id: 'ST-002', name: 'Juma M', role: UserRole.BRANCH_MANAGER, branchId: 'BR001', email: 'juma@afyatrack.co.tz', phone: '+255 712 345 678', status: 'ACTIVE', joinedDate: '2022-03-15', lastLogin: '2 hrs ago', username: 'juma', password: '123' },
+  { id: 'ST-003', name: 'Sarah K', role: UserRole.PHARMACIST, branchId: 'BR002', email: 'sarah@afyatrack.co.tz', phone: '+255 755 123 456', status: 'ACTIVE', joinedDate: '2022-06-10', lastLogin: '5 hrs ago', username: 'sarah', password: '123' },
+  { id: 'ST-004', name: 'David L', role: UserRole.INVENTORY_CONTROLLER, branchId: 'HEAD_OFFICE', email: 'david@afyatrack.co.tz', phone: '+255 655 987 654', status: 'ACTIVE', joinedDate: '2023-01-20', lastLogin: '1 day ago', username: 'david', password: '123' },
+  { id: 'ST-005', name: 'Grace P', role: UserRole.CASHIER, branchId: 'BR001', email: 'grace@afyatrack.co.tz', phone: '+255 688 111 222', status: 'ACTIVE', joinedDate: '2023-05-12', lastLogin: '10 mins ago', username: 'grace', password: '123' },
+  { id: 'ST-006', name: 'Hassan A', role: UserRole.ACCOUNTANT, branchId: 'HEAD_OFFICE', email: 'hassan@afyatrack.co.tz', phone: '+255 777 333 444', status: 'ACTIVE', joinedDate: '2023-02-01', lastLogin: '3 days ago', username: 'hassan', password: '123' },
+  { id: 'ST-007', name: 'Rehema P', role: UserRole.BRANCH_MANAGER, branchId: 'BR004', email: 'rehema@afyatrack.co.tz', phone: '+255 713 555 666', status: 'ACTIVE', joinedDate: '2023-08-01', lastLogin: '1 hr ago', username: 'rehema', password: '123' },
+  { id: 'ST-008', name: 'John D', role: UserRole.PHARMACIST, branchId: 'BR001', email: 'john@afyatrack.co.tz', phone: '+255 766 888 999', status: 'INACTIVE', joinedDate: '2022-11-15', lastLogin: '2 weeks ago', username: 'john', password: '123' },
 ];
 
 export const PRODUCTS: Product[] = [
@@ -83,6 +83,8 @@ export const STOCK_TRANSFERS: StockTransfer[] = [
       { productId: '4', productName: 'Cipro 500mg', quantity: 100, batchNumber: 'CIP-NEW-02', expiryDate: '2025-03-15' }
     ],
     status: 'IN_TRANSIT',
+    keeperCode: '228899', // Verification Code
+    controllerCode: '554411', // Verification Code
     workflow: {
       step: 'KEEPER_CHECK',
       logs: [
@@ -99,6 +101,8 @@ export const STOCK_TRANSFERS: StockTransfer[] = [
       { productId: '1', productName: 'Panadol Extra', quantity: 200, batchNumber: 'PANA-X-99', expiryDate: '2026-01-01' }
     ],
     status: 'RECEIVED_KEEPER',
+    keeperCode: '112233', // Used (conceptually)
+    controllerCode: '778899', // Pending verification
     workflow: {
       step: 'CONTROLLER_VERIFY',
       logs: [
