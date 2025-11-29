@@ -50,12 +50,19 @@ export interface Product {
   genericName: string;
   category: string; // e.g., Antibiotic, Analgesic
   costPrice: number; // Buying Price per unit
-  price: number; // Selling Price per unit
+  price: number; // Selling Price per unit (Global Base Price)
   unit: string; // e.g., Tablet, Bottle
   minStockLevel: number;
   batches: DrugBatch[];
   requiresPrescription: boolean;
   totalStock: number; // Calculated field
+}
+
+export interface BranchInventoryItem {
+  productId: string;
+  quantity: number;
+  batches: DrugBatch[];
+  customPrice?: number; // Optional override for branch-specific pricing
 }
 
 export interface CartItem extends Product {

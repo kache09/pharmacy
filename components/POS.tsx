@@ -1,17 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon } from 'lucide-react';
-import { Product, CartItem, PaymentMethod } from '../types';
+import { Product, CartItem, PaymentMethod, BranchInventoryItem } from '../types';
 import { checkDrugInteractions } from '../services/geminiService';
-import { BRANCHES } from '../data/mockData';
-
-const MOCK_PRODUCTS: Product[] = [
-  { id: '1', name: 'Panadol Extra', genericName: 'Paracetamol', category: 'Painkiller', costPrice: 3500, price: 5000, unit: 'Strip', minStockLevel: 10, totalStock: 100, requiresPrescription: false, batches: [] },
-  { id: '2', name: 'Augmentin 625mg', genericName: 'Amoxicillin/Clavulanate', category: 'Antibiotic', costPrice: 11000, price: 15000, unit: 'Box', minStockLevel: 5, totalStock: 40, requiresPrescription: true, batches: [] },
-  { id: '3', name: 'Azuma', genericName: 'Azithromycin', category: 'Antibiotic', costPrice: 8500, price: 12000, unit: 'Box', minStockLevel: 5, totalStock: 30, requiresPrescription: true, batches: [] },
-  { id: '4', name: 'Cetirizine', genericName: 'Cetirizine', category: 'Antihistamine', costPrice: 1500, price: 3000, unit: 'Strip', minStockLevel: 20, totalStock: 200, requiresPrescription: false, batches: [] },
-  { id: '5', name: 'Vitamin C + Zinc', genericName: 'Ascorbic Acid', category: 'Supplement', costPrice: 5000, price: 8000, unit: 'Bottle', minStockLevel: 10, totalStock: 80, requiresPrescription: false, batches: [] },
-];
+import { BRANCHES, PRODUCTS, BRANCH_INVENTORY } from '../data/mockData';
 
 const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -22,6 +14,19 @@ const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+
+  // Merge Products with Branch Specific Prices
+  const availableProducts: Product[] = PRODUCTS.map(p => {
+    const branchStock = BRANCH_INVENTORY[currentBranchId] || [];
+    const inventoryItem = branchStock.find(i => i.productId === p.id);
+    const customPrice = inventoryItem?.customPrice;
+
+    return {
+      ...p,
+      price: customPrice || p.price, // Override with custom price if exists
+      totalStock: inventoryItem ? inventoryItem.quantity : 0 // Update stock level visual
+    };
+  });
 
   // Calculate totals
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -76,7 +81,7 @@ const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
     setTimeout(() => setSuccessMsg(''), 5000);
   };
 
-  const filteredProducts = MOCK_PRODUCTS.filter(p => 
+  const filteredProducts = availableProducts.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.genericName.toLowerCase().includes(searchTerm.toLowerCase())
   );

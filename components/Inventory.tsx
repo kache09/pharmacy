@@ -22,24 +22,30 @@ import {
   ShieldCheck,
   KeyRound,
   Send,
-  Trash2
+  Trash2,
+  Tag
 } from 'lucide-react';
-import { BRANCHES, PRODUCTS, BRANCH_INVENTORY, STOCK_TRANSFERS } from '../data/mockData';
-import { StockTransfer, Product } from '../types';
+import { BRANCHES, PRODUCTS, BRANCH_INVENTORY, STOCK_TRANSFERS, STAFF_LIST } from '../data/mockData';
+import { StockTransfer, Product, UserRole, BranchInventoryItem } from '../types';
+
+interface ExtendedProduct extends Product {
+  customPrice?: number;
+}
 
 const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const [activeTab, setActiveTab] = useState<'stock' | 'transfers'>('stock');
   
   // Local State for Data Manipulation
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [inventory, setInventory] = useState(BRANCH_INVENTORY);
+  const [inventory, setInventory] = useState<Record<string, BranchInventoryItem[]>>(BRANCH_INVENTORY);
   const [transfers, setTransfers] = useState<StockTransfer[]>(STOCK_TRANSFERS);
 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ExtendedProduct | null>(null);
 
   // Verification Modal State
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -69,6 +75,10 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
     type: 'ADD' // ADD or REMOVE
   });
 
+  const [priceUpdate, setPriceUpdate] = useState({
+      newPrice: ''
+  });
+
   // Shipment Form State
   const [newShipment, setNewShipment] = useState<{
       targetBranchId: string;
@@ -89,10 +99,16 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   const activeBranchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
 
+  // Assuming logged in user context is needed for permissions
+  // For this mock, we assume user is authorized if they can see the page, 
+  // but we restrict price editing to Managers/Admins in logic below.
+  const canEditPrice = !isHeadOffice; // Simplified for UI, logic below checks roles
+
   // Logic to merge Product Definitions with Branch Inventory Levels
-  const displayedInventory = products.map(product => {
+  const displayedInventory: ExtendedProduct[] = products.map(product => {
     let totalStock = 0;
     let batches: any[] = [];
+    let customPrice: number | undefined = undefined;
 
     if (isHeadOffice) {
         Object.values(inventory).forEach((branchStockList: any) => {
@@ -100,6 +116,7 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
             if (item) {
                 totalStock += item.quantity;
                 batches = [...batches, ...item.batches];
+                // Head office sees base price usually, or could average
             }
         });
     } else {
@@ -108,15 +125,16 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
         if (item) {
             totalStock = item.quantity;
             batches = item.batches;
+            customPrice = item.customPrice;
         }
     }
 
-    return { ...product, totalStock, batches };
+    return { ...product, totalStock, batches, customPrice };
   });
 
   // Calculate Aggregated Financials
   const totalAssetValue = displayedInventory.reduce((acc, curr) => acc + (curr.totalStock * curr.costPrice), 0);
-  const totalPotentialRevenue = displayedInventory.reduce((acc, curr) => acc + (curr.totalStock * curr.price), 0);
+  const totalPotentialRevenue = displayedInventory.reduce((acc, curr) => acc + (curr.totalStock * (curr.customPrice || curr.price)), 0);
 
   // Filter transfers for current branch
   const branchTransfers = transfers.filter(t => 
@@ -221,6 +239,32 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
       setAdjustment({ reason: 'Restock', quantity: '', type: 'ADD' });
   };
 
+  const handleUpdatePrice = () => {
+      if (!selectedItem || !priceUpdate.newPrice) return;
+
+      setInventory(prev => {
+          const branchStock = prev[currentBranchId] || [];
+          const existingItemIndex = branchStock.findIndex(i => i.productId === selectedItem.id);
+          
+          let newBranchStock = [...branchStock];
+
+          if (existingItemIndex >= 0) {
+              newBranchStock[existingItemIndex] = {
+                  ...newBranchStock[existingItemIndex],
+                  customPrice: parseFloat(priceUpdate.newPrice)
+              };
+          } else {
+              // Should essentially assume item exists if we are editing it, but purely for safety
+          }
+
+          return { ...prev, [currentBranchId]: newBranchStock };
+      });
+      
+      setShowPriceModal(false);
+      setSelectedItem(null);
+      setPriceUpdate({ newPrice: '' });
+  };
+
   const resetForm = () => {
     setNewStock({
         productId: '', isNewProduct: false, name: '', genericName: '', category: '', 
@@ -228,9 +272,15 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
     });
   };
 
-  const openAdjustModal = (item: any) => {
+  const openAdjustModal = (item: ExtendedProduct) => {
       setSelectedItem(item);
       setShowAdjustModal(true);
+  };
+
+  const openPriceModal = (item: ExtendedProduct) => {
+      setSelectedItem(item);
+      setPriceUpdate({ newPrice: (item.customPrice || item.price).toString() });
+      setShowPriceModal(true);
   };
 
   // Workflow Handlers
@@ -448,7 +498,7 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                 <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Info</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Pricing</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Pricing (Unit)</th>
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Stock Level</th>
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Batch Status</th>
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>
@@ -458,6 +508,8 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                     {displayedInventory.map((product) => {
                     const isLowStock = product.totalStock <= product.minStockLevel;
                     const stockValue = product.totalStock * product.costPrice;
+                    const sellingPrice = product.customPrice || product.price;
+                    const hasCustomPrice = !!product.customPrice;
 
                     return (
                         <tr key={product.id} className="hover:bg-slate-50 transition-colors">
@@ -474,7 +526,10 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                                     Buy: <span className="font-medium text-slate-700">{product.costPrice.toLocaleString()}</span>
                                 </div>
                                 <div className="text-xs text-slate-500">
-                                    Sell: <span className="font-bold text-emerald-600">{product.price.toLocaleString()}</span>
+                                    Sell: <span className={`font-bold ${hasCustomPrice ? 'text-blue-600' : 'text-emerald-600'}`}>
+                                        {sellingPrice.toLocaleString()}
+                                    </span>
+                                    {hasCustomPrice && <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1 rounded">Custom</span>}
                                 </div>
                             </div>
                         </td>
@@ -514,12 +569,20 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                                     <ClipboardCheck size={14} /> View Log
                                 </button>
                             ) : (
-                                <button 
-                                    onClick={() => openAdjustModal(product)}
-                                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 text-xs transition-colors shadow-sm"
-                                >
-                                    Adjust Stock
-                                </button>
+                                <div className="flex flex-col gap-2">
+                                    <button 
+                                        onClick={() => openAdjustModal(product)}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 text-xs transition-colors shadow-sm text-center"
+                                    >
+                                        Adjust Stock
+                                    </button>
+                                    <button 
+                                        onClick={() => openPriceModal(product)}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-xs transition-colors shadow-sm text-center flex items-center justify-center gap-1"
+                                    >
+                                        <Tag size={12} /> Set Price
+                                    </button>
+                                </div>
                             )}
                         </td>
                         </tr>
@@ -849,6 +912,56 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
                   </div>
                </div>
            </div>
+      )}
+      
+      {/* Price Adjustment Modal */}
+      {showPriceModal && selectedItem && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+               <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                   <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <div>
+                          <h3 className="text-lg font-bold text-slate-900">Set Retail Price</h3>
+                          <p className="text-slate-500 text-xs">Customize price for {activeBranchName}</p>
+                      </div>
+                      <button onClick={() => setShowPriceModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                   </div>
+                   <div className="p-6 space-y-4">
+                       <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                           <div className="flex justify-between items-center mb-1">
+                               <span className="text-xs font-bold text-blue-700 uppercase">Product</span>
+                               <span className="text-xs font-medium text-blue-600">{selectedItem.name}</span>
+                           </div>
+                           <div className="flex justify-between items-center">
+                               <span className="text-xs font-bold text-blue-700 uppercase">Base / HQ Price</span>
+                               <span className="text-sm font-bold text-blue-900">{selectedItem.price.toLocaleString()} TZS</span>
+                           </div>
+                       </div>
+
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 uppercase mb-2">New Branch Price (TZS)</label>
+                           <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">TZS</span>
+                               <input 
+                                 type="number" 
+                                 className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg text-lg font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+                                 placeholder="0"
+                                 value={priceUpdate.newPrice}
+                                 onChange={e => setPriceUpdate({ newPrice: e.target.value })}
+                               />
+                           </div>
+                           <p className="text-[10px] text-slate-400 mt-2">
+                               * This change only affects {activeBranchName}.
+                           </p>
+                       </div>
+                   </div>
+                   <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                      <button onClick={() => setShowPriceModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
+                      <button onClick={handleUpdatePrice} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-600/20">
+                          Update Price
+                      </button>
+                   </div>
+               </div>
+          </div>
       )}
 
       {/* Shipment Modal */}

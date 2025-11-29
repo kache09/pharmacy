@@ -1,5 +1,5 @@
 
-import { Branch, Product, Sale, StockTransfer, Invoice, PaymentMethod, Staff, UserRole, Patient, Prescription, AuditLog } from '../types';
+import { Branch, Product, Sale, StockTransfer, Invoice, PaymentMethod, Staff, UserRole, Patient, Prescription, AuditLog, BranchInventoryItem } from '../types';
 
 export const BRANCHES: Branch[] = [
   { id: 'HEAD_OFFICE', name: 'Head Office (Global View)', location: 'HQ', manager: 'Super Admin', status: 'ACTIVE' },
@@ -25,18 +25,20 @@ export const PRODUCTS: Product[] = [
   { id: '2', name: 'Augmentin 625mg', genericName: 'Amoxicillin/Clavulanate', category: 'Antibiotic', costPrice: 11000, price: 15000, unit: 'Box', minStockLevel: 20, totalStock: 0, requiresPrescription: true, batches: [] },
   { id: '3', name: 'Metformin 500mg', genericName: 'Metformin', category: 'Diabetes', costPrice: 5500, price: 8000, unit: 'Box', minStockLevel: 10, totalStock: 0, requiresPrescription: true, batches: [] },
   { id: '4', name: 'Cipro 500mg', genericName: 'Cipro', category: 'Antibiotic', costPrice: 4000, price: 6000, unit: 'Box', minStockLevel: 15, totalStock: 0, requiresPrescription: true, batches: [] },
+  { id: '5', name: 'Vitamin C + Zinc', genericName: 'Ascorbic Acid', category: 'Supplement', costPrice: 5000, price: 8000, unit: 'Bottle', minStockLevel: 10, totalStock: 80, requiresPrescription: false, batches: [] },
+  { id: '6', name: 'Cetirizine', genericName: 'Cetirizine', category: 'Antihistamine', costPrice: 1500, price: 3000, unit: 'Strip', minStockLevel: 20, totalStock: 200, requiresPrescription: false, batches: [] },
 ];
 
 // Mapping stock per branch for logic simulation
-export const BRANCH_INVENTORY: Record<string, { productId: string; quantity: number; batches: any[] }[]> = {
+export const BRANCH_INVENTORY: Record<string, BranchInventoryItem[]> = {
   'BR001': [ // Kariakoo
     { productId: '1', quantity: 120, batches: [{ batchNumber: 'PANA-001', expiryDate: '2025-06-01', quantity: 120 }] },
     { productId: '2', quantity: 15, batches: [{ batchNumber: 'AUG-992', expiryDate: '2023-12-01', quantity: 15 }] },
     { productId: '3', quantity: 200, batches: [{ batchNumber: 'MET-101', expiryDate: '2026-01-01', quantity: 200 }] },
   ],
-  'BR002': [ // Masaki
-    { productId: '1', quantity: 450, batches: [{ batchNumber: 'PANA-003', expiryDate: '2025-08-01', quantity: 450 }] },
-    { productId: '2', quantity: 80, batches: [{ batchNumber: 'AUG-994', expiryDate: '2024-05-01', quantity: 80 }] },
+  'BR002': [ // Masaki - Higher prices for some items
+    { productId: '1', quantity: 450, batches: [{ batchNumber: 'PANA-003', expiryDate: '2025-08-01', quantity: 450 }], customPrice: 6000 },
+    { productId: '2', quantity: 80, batches: [{ batchNumber: 'AUG-994', expiryDate: '2024-05-01', quantity: 80 }], customPrice: 18000 },
   ],
   'BR004': [ // Dodoma
     { productId: '1', quantity: 60, batches: [{ batchNumber: 'PANA-005', expiryDate: '2025-02-01', quantity: 60 }] },
