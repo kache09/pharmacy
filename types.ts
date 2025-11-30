@@ -76,7 +76,9 @@ export interface Sale {
   date: string;
   branchId: string;
   items: CartItem[];
-  totalAmount: number;
+  totalAmount: number; // Revenue
+  totalCost: number; // Cost of Goods Sold (COGS)
+  profit: number; // Revenue - Cost
   paymentMethod: PaymentMethod;
   customerName?: string;
   insuranceProvider?: string;

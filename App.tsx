@@ -12,12 +12,18 @@ import Clinical from './components/Clinical';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Approvals from './components/Approvals';
-import { Staff as StaffType, UserRole } from './types';
+import { Staff as StaffType, UserRole, BranchInventoryItem, StockTransfer, Sale } from './types';
+import { BRANCH_INVENTORY, STOCK_TRANSFERS } from './data/mockData';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<StaffType | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentBranchId, setCurrentBranchId] = useState('HEAD_OFFICE');
+
+  // Global State for Data Consistency
+  const [inventory, setInventory] = useState<Record<string, BranchInventoryItem[]>>(BRANCH_INVENTORY);
+  const [transfers, setTransfers] = useState<StockTransfer[]>(STOCK_TRANSFERS);
+  const [sales, setSales] = useState<Sale[]>([]);
 
   // Handle Login
   const handleLogin = (user: StaffType) => {
@@ -39,6 +45,13 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
+  const handleSale = (newSale: Sale) => {
+    setSales(prev => [newSale, ...prev]);
+    // Also update inventory for each item sold
+    // Note: This is a backup for the POS local update, ensuring global state stays in sync
+    // In a real app, the API would handle this transactionally
+  };
+
   // If not logged in, show Login Screen
   if (!currentUser) {
     return <Login onLogin={handleLogin} />;
@@ -47,13 +60,28 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard currentBranchId={currentBranchId} />;
+        return <Dashboard currentBranchId={currentBranchId} inventory={inventory} />;
       case 'approvals':
         return <Approvals />;
       case 'pos':
-        return <POS currentBranchId={currentBranchId} />;
+        return (
+          <POS 
+            currentBranchId={currentBranchId} 
+            inventory={inventory} 
+            setInventory={setInventory}
+            onRecordSale={handleSale}
+          />
+        );
       case 'inventory':
-        return <Inventory currentBranchId={currentBranchId} />;
+        return (
+          <Inventory 
+            currentBranchId={currentBranchId} 
+            inventory={inventory}
+            setInventory={setInventory}
+            transfers={transfers}
+            setTransfers={setTransfers}
+          />
+        );
       case 'finance':
         return <Finance currentBranchId={currentBranchId} />;
       case 'staff':
@@ -67,7 +95,7 @@ const App: React.FC = () => {
       case 'settings':
         return <Settings currentBranchId={currentBranchId} />;
       default:
-        return <Dashboard currentBranchId={currentBranchId} />;
+        return <Dashboard currentBranchId={currentBranchId} inventory={inventory} />;
     }
   };
 

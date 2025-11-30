@@ -26,26 +26,32 @@ import {
   Tag,
   FilePlus
 } from 'lucide-react';
-import { BRANCHES, PRODUCTS, BRANCH_INVENTORY, STOCK_TRANSFERS, STAFF_LIST } from '../data/mockData';
+import { BRANCHES, PRODUCTS, STAFF_LIST } from '../data/mockData';
 import { StockTransfer, Product, UserRole, BranchInventoryItem } from '../types';
 
 interface ExtendedProduct extends Product {
   customPrice?: number;
 }
 
-const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
+interface InventoryProps {
+  currentBranchId: string;
+  inventory: Record<string, BranchInventoryItem[]>;
+  setInventory: React.Dispatch<React.SetStateAction<Record<string, BranchInventoryItem[]>>>;
+  transfers: StockTransfer[];
+  setTransfers: React.Dispatch<React.SetStateAction<StockTransfer[]>>;
+}
+
+const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setInventory, transfers, setTransfers }) => {
   const [activeTab, setActiveTab] = useState<'stock' | 'transfers'>('stock');
   
-  // Local State for Data Manipulation
+  // Local State for Products (Mocking database of products)
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [inventory, setInventory] = useState<Record<string, BranchInventoryItem[]>>(BRANCH_INVENTORY);
-  const [transfers, setTransfers] = useState<StockTransfer[]>(STOCK_TRANSFERS);
 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showRequestModal, setShowRequestModal] = useState(false); // New Request Modal
+  const [showRequestModal, setShowRequestModal] = useState(false); 
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ExtendedProduct | null>(null);
 
@@ -69,12 +75,6 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
     batchNumber: '',
     expiryDate: '',
     quantity: ''
-  });
-
-  const [adjustment, setAdjustment] = useState({
-    reason: 'Restock',
-    quantity: '',
-    type: 'ADD' // ADD or REMOVE
   });
 
   const [priceUpdate, setPriceUpdate] = useState({
@@ -138,11 +138,12 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
   // --- Handlers ---
 
   const handleSaveStock = () => {
-    // Simplified logic for brevity - matches previous version
     let targetProductId = newStock.productId;
+    // Logic for new product creation simplified for mock
     if (newStock.isNewProduct) {
         const newId = (products.length + 1).toString();
-        setProducts([...products, { ...newStock, id: newId, costPrice: parseFloat(newStock.costPrice), price: parseFloat(newStock.price), minStockLevel: 10, totalStock: 0, requiresPrescription: false, batches: [] } as any]);
+        // @ts-ignore
+        setProducts([...products, { ...newStock, id: newId, costPrice: parseFloat(newStock.costPrice), price: parseFloat(newStock.price), minStockLevel: 10, totalStock: 0, requiresPrescription: false, batches: [] }]);
         targetProductId = newId;
     }
 
@@ -172,11 +173,6 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
     });
     setShowAddModal(false);
     resetForm();
-  };
-
-  const handleAdjustStock = () => {
-      // Logic from previous implementation
-      setShowAdjustModal(false);
   };
 
   const handleUpdatePrice = () => {
@@ -221,9 +217,46 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
       }
 
       if (verifyStep === 'KEEPER') {
+          // Just update status to RECEIVED_KEEPER
           setTransfers(prev => prev.map(t => t.id === activeTransferId ? { ...t, status: 'RECEIVED_KEEPER', workflow: { ...t.workflow, logs: [...t.workflow.logs, { role: 'Store Keeper', action: 'Confirmed', timestamp: new Date().toLocaleString(), user: 'Current User' }] } } as StockTransfer : t));
       } else {
-           setTransfers(prev => prev.map(t => t.id === activeTransferId ? { ...t, status: 'COMPLETED', workflow: { ...t.workflow, logs: [...t.workflow.logs, { role: 'Controller', action: 'Verified', timestamp: new Date().toLocaleString(), user: 'Current User' }] } } as StockTransfer : t));
+           // CONTROLLER VERIFICATION - THIS COMMITS TO INVENTORY
+           setTransfers(prev => prev.map(t => t.id === activeTransferId ? { ...t, status: 'COMPLETED', workflow: { ...t.workflow, logs: [...t.workflow.logs, { role: 'Controller', action: 'Verified & Stocked', timestamp: new Date().toLocaleString(), user: 'Current User' }] } } as StockTransfer : t));
+           
+           // Update Inventory State
+           setInventory(prev => {
+               const branchId = transfer.targetBranchId;
+               const currentBranchStock = [...(prev[branchId] || [])];
+
+               transfer.items.forEach(item => {
+                   const existingItemIndex = currentBranchStock.findIndex(i => i.productId === item.productId);
+                   
+                   if (existingItemIndex >= 0) {
+                       // Update existing product
+                       currentBranchStock[existingItemIndex].quantity += item.quantity;
+                       currentBranchStock[existingItemIndex].batches.push({
+                           batchNumber: item.batchNumber,
+                           expiryDate: item.expiryDate,
+                           quantity: item.quantity
+                       });
+                   } else {
+                       // Add new product entry for branch
+                       currentBranchStock.push({
+                           productId: item.productId,
+                           quantity: item.quantity,
+                           batches: [{
+                               batchNumber: item.batchNumber,
+                               expiryDate: item.expiryDate,
+                               quantity: item.quantity
+                           }]
+                       });
+                   }
+               });
+
+               return { ...prev, [branchId]: currentBranchStock };
+           });
+           
+           alert("Stock has been successfully verified and added to the active inventory.");
       }
       setShowVerifyModal(false);
   };
@@ -275,7 +308,6 @@ const Inventory: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
   };
 
   const handleCreateRequisition = () => {
-      // In a real app, this would post to an API
       alert("Stock Requisition sent to Head Office for Approval.");
       setShowRequestModal(false);
       setNewShipment({ targetBranchId: '', notes: '', items: [] });

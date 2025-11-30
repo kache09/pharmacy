@@ -1,11 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon } from 'lucide-react';
-import { Product, CartItem, PaymentMethod, BranchInventoryItem } from '../types';
+import { Product, CartItem, PaymentMethod, BranchInventoryItem, Sale } from '../types';
 import { checkDrugInteractions } from '../services/geminiService';
-import { BRANCHES, PRODUCTS, BRANCH_INVENTORY } from '../data/mockData';
+import { BRANCHES, PRODUCTS } from '../data/mockData';
 
-const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
+interface POSProps {
+  currentBranchId: string;
+  inventory: Record<string, BranchInventoryItem[]>;
+  setInventory: React.Dispatch<React.SetStateAction<Record<string, BranchInventoryItem[]>>>;
+  onRecordSale: (sale: Sale) => void;
+}
+
+const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onRecordSale }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -15,21 +22,22 @@ const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
 
-  // Merge Products with Branch Specific Prices
+  // Merge Products with Branch Specific Inventory (LIVE from Props)
   const availableProducts: Product[] = PRODUCTS.map(p => {
-    const branchStock = BRANCH_INVENTORY[currentBranchId] || [];
-    const inventoryItem = branchStock.find(i => i.productId === p.id);
+    const branchStockList = inventory[currentBranchId] || [];
+    const inventoryItem = branchStockList.find(i => i.productId === p.id);
     const customPrice = inventoryItem?.customPrice;
 
     return {
       ...p,
       price: customPrice || p.price, // Override with custom price if exists
-      totalStock: inventoryItem ? inventoryItem.quantity : 0 // Update stock level visual
+      totalStock: inventoryItem ? inventoryItem.quantity : 0 // Show ONLY approved stock
     };
   });
 
   // Calculate totals
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalCost = cart.reduce((sum, item) => sum + (item.costPrice * item.quantity), 0);
   const vat = subtotal * 0.18; // Tanzania VAT 18%
   const total = subtotal + vat;
 
@@ -51,6 +59,13 @@ const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   }, [cart]);
 
   const addToCart = (product: Product) => {
+    // Check if enough stock
+    const currentQtyInCart = cart.find(i => i.id === product.id)?.quantity || 0;
+    if (currentQtyInCart + 1 > product.totalStock) {
+        alert("Insufficient stock in inventory.");
+        return;
+    }
+
     setCart(prev => {
       const existing = prev.find(p => p.id === product.id);
       if (existing) {
@@ -65,25 +80,86 @@ const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   };
 
   const updateQuantity = (id: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
-      }
-      return item;
-    }));
+    setCart(prev => {
+        const item = prev.find(i => i.id === id);
+        if (!item) return prev;
+        
+        // Find actual product stock
+        const product = availableProducts.find(p => p.id === id);
+        if (!product) return prev;
+
+        const newQty = item.quantity + delta;
+
+        if (newQty > product.totalStock) {
+            alert("Cannot add more. Exceeds available stock.");
+            return prev;
+        }
+
+        if (newQty < 1) return prev; // Use remove button for deletion
+
+        return prev.map(p => p.id === id ? { ...p, quantity: newQty } : p);
+    });
   };
 
   const handleCheckout = (method: PaymentMethod) => {
     setPaymentModalOpen(false);
-    setSuccessMsg(`Sale Completed at ${branchName}! TRA Receipt #${Math.floor(Math.random() * 900000) + 100000} Generated.`);
+
+    // 1. Create Sale Record
+    const sale: Sale = {
+        id: `SALE-${Date.now()}`,
+        date: new Date().toISOString(),
+        branchId: currentBranchId,
+        items: cart,
+        totalAmount: total,
+        totalCost: totalCost,
+        profit: subtotal - totalCost, // Net Profit (Excluding VAT)
+        paymentMethod: method,
+        status: 'COMPLETED'
+    };
+
+    onRecordSale(sale);
+
+    // 2. Deduct from Global Inventory
+    setInventory(prev => {
+        const branchStock = [...(prev[currentBranchId] || [])];
+        
+        cart.forEach(cartItem => {
+            const index = branchStock.findIndex(i => i.productId === cartItem.id);
+            if (index !== -1) {
+                // Deduct total quantity
+                branchStock[index].quantity = Math.max(0, branchStock[index].quantity - cartItem.quantity);
+                
+                // Deduct from batches (FIFO Logic - simplified)
+                let remainingToDeduct = cartItem.quantity;
+                const updatedBatches = branchStock[index].batches.map(batch => {
+                     if (remainingToDeduct <= 0) return batch;
+                     
+                     if (batch.quantity >= remainingToDeduct) {
+                         const newBatchQty = batch.quantity - remainingToDeduct;
+                         remainingToDeduct = 0;
+                         return { ...batch, quantity: newBatchQty };
+                     } else {
+                         remainingToDeduct -= batch.quantity;
+                         return { ...batch, quantity: 0 };
+                     }
+                }).filter(b => b.quantity > 0); // Remove empty batches
+
+                branchStock[index].batches = updatedBatches;
+            }
+        });
+
+        return { ...prev, [currentBranchId]: branchStock };
+    });
+
+    setSuccessMsg(`Sale Completed! Profit: ${(subtotal - totalCost).toLocaleString()} TZS. TRA Receipt Generated.`);
     setCart([]);
     setTimeout(() => setSuccessMsg(''), 5000);
   };
 
   const filteredProducts = availableProducts.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.genericName.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    p.genericName.toLowerCase().includes(searchTerm.toLowerCase()))
+    && p.totalStock > 0 // Hide out of stock items in POS list for cleaner UI
   );
 
   if (isHeadOffice) {
@@ -133,7 +209,10 @@ const POS: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                 <h3 className="font-bold text-slate-800 mb-1 group-hover:text-teal-700">{product.name}</h3>
                 <p className="text-xs text-slate-500 mb-3">{product.genericName}</p>
                 <div className="mt-auto pt-2 border-t border-slate-100 w-full flex justify-between items-center">
-                   <span className="font-bold text-slate-900">{(product.price).toLocaleString()} TZS</span>
+                   <div className="flex flex-col">
+                       <span className="font-bold text-slate-900">{(product.price).toLocaleString()} TZS</span>
+                       <span className="text-[10px] text-slate-400">Stock: {product.totalStock}</span>
+                   </div>
                 </div>
               </button>
             ))}

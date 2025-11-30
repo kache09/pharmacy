@@ -15,7 +15,8 @@ import {
   Cell
 } from 'recharts';
 import { TrendingUp, AlertTriangle, DollarSign, Users, Store } from 'lucide-react';
-import { WEEKLY_SALES_DATA, BRANCH_FINANCE_STATS, BRANCHES } from '../data/mockData';
+import { WEEKLY_SALES_DATA, BRANCH_FINANCE_STATS, BRANCHES, PRODUCTS } from '../data/mockData';
+import { BranchInventoryItem } from '../types';
 
 const branchPerformance = [
   { name: 'Kariakoo', value: 45000000 },
@@ -47,14 +48,38 @@ const StatCard = ({ title, value, subtext, icon: Icon, color }: any) => (
   </div>
 );
 
-const Dashboard: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
+const Dashboard: React.FC<{currentBranchId: string, inventory: Record<string, BranchInventoryItem[]>}> = ({ currentBranchId, inventory }) => {
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   
   // Dynamic Data Selection based on Branch Context
   const stats = (BRANCH_FINANCE_STATS as any)[currentBranchId] || BRANCH_FINANCE_STATS['HEAD_OFFICE'];
-  const chartData = (WEEKLY_SALES_DATA as any)[currentBranchId] || (WEEKLY_SALES_DATA as any)['BR001']; // Fallback for minor branches to generic data for demo
+  const chartData = (WEEKLY_SALES_DATA as any)[currentBranchId] || (WEEKLY_SALES_DATA as any)['BR001']; 
 
   const activeBranchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+
+  // Calculate Low Stock Alerts using Prop Inventory
+  let lowStockCount = 0;
+  const criticalItems: {name: string, stock: number, branch: string}[] = [];
+
+  const branchesToCheck = isHeadOffice ? Object.keys(inventory) : [currentBranchId];
+  
+  branchesToCheck.forEach(bId => {
+      const stockList = inventory[bId] || [];
+      stockList.forEach(item => {
+          const productDef = PRODUCTS.find(p => p.id === item.productId);
+          if (productDef && item.quantity <= productDef.minStockLevel) {
+              lowStockCount++;
+              if (criticalItems.length < 5) {
+                  criticalItems.push({
+                      name: productDef.name,
+                      stock: item.quantity,
+                      branch: BRANCHES.find(b => b.id === bId)?.name || bId
+                  });
+              }
+          }
+      });
+  });
+
 
   return (
     <div className="space-y-8">
@@ -62,7 +87,7 @@ const Dashboard: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
         <h2 className="text-3xl font-bold text-slate-900">{isHeadOffice ? 'Head Office Overview' : `${activeBranchName} Overview`}</h2>
         <p className="text-slate-500 mt-1">
           {isHeadOffice 
-            ? 'Real-time aggregated insights across all 4 branches.' 
+            ? 'Real-time aggregated insights across all branches.' 
             : `Monitoring performance for ${activeBranchName} only.`
           }
         </p>
@@ -86,8 +111,8 @@ const Dashboard: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
         />
         <StatCard 
           title="Stock Alerts" 
-          value={isHeadOffice ? "24 Items" : "5 Items"} 
-          subtext="Low Stock / Expiring" 
+          value={`${lowStockCount} Items`} 
+          subtext="Low Stock Level" 
           icon={AlertTriangle} 
           color="bg-amber-500" 
         />
@@ -174,7 +199,7 @@ const Dashboard: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-lg font-bold text-slate-800">
-             {isHeadOffice ? 'Critical Stock Alerts (All Branches)' : 'Branch Stock Alerts'}
+             {isHeadOffice ? 'Critical Stock Alerts (Real-time)' : 'Branch Stock Alerts'}
           </h3>
           <button className="text-teal-600 text-sm font-medium hover:underline">View All Inventory</button>
         </div>
@@ -182,31 +207,27 @@ const Dashboard: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => 
           <thead className="bg-slate-50 text-slate-700 font-semibold uppercase text-xs">
             <tr>
               <th className="px-6 py-4">Product Name</th>
-              <th className="px-6 py-4">Batch No.</th>
               <th className="px-6 py-4">Branch</th>
-              <th className="px-6 py-4">Expiry Date</th>
-              <th className="px-6 py-4">Stock</th>
+              <th className="px-6 py-4">Current Stock</th>
+              <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            <tr className="hover:bg-slate-50">
-              <td className="px-6 py-4 font-medium text-slate-800">Amoxicillin 500mg</td>
-              <td className="px-6 py-4">B-2901</td>
-              <td className="px-6 py-4">Kariakoo</td>
-              <td className="px-6 py-4 text-red-600 font-medium">Oct 15, 2023</td>
-              <td className="px-6 py-4">45 Boxes</td>
-              <td className="px-6 py-4 text-teal-600 hover:text-teal-800 cursor-pointer">Reorder</td>
-            </tr>
-            {(isHeadOffice || currentBranchId === 'BR002') && (
-            <tr className="hover:bg-slate-50">
-              <td className="px-6 py-4 font-medium text-slate-800">Cipro 500mg</td>
-              <td className="px-6 py-4">B-4402</td>
-              <td className="px-6 py-4">Masaki</td>
-              <td className="px-6 py-4 text-amber-600 font-medium">Nov 01, 2023</td>
-              <td className="px-6 py-4">12 Boxes</td>
-              <td className="px-6 py-4 text-teal-600 hover:text-teal-800 cursor-pointer">Transfer</td>
-            </tr>
+            {criticalItems.length === 0 ? (
+                <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400 italic">No low stock items detected.</td>
+                </tr>
+            ) : (
+                criticalItems.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="px-6 py-4 font-medium text-slate-800">{item.name}</td>
+                      <td className="px-6 py-4">{item.branch}</td>
+                      <td className="px-6 py-4 text-red-600 font-bold">{item.stock} Units</td>
+                      <td className="px-6 py-4"><span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">LOW</span></td>
+                      <td className="px-6 py-4 text-teal-600 hover:text-teal-800 cursor-pointer">Reorder</td>
+                    </tr>
+                ))
             )}
           </tbody>
         </table>
