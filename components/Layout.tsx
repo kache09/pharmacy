@@ -13,7 +13,8 @@ import {
   Store,
   MapPin,
   Users,
-  Lock
+  Lock,
+  ClipboardCheck
 } from 'lucide-react';
 import { BRANCHES } from '../data/mockData';
 import { Staff, UserRole } from '../types';
@@ -33,7 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
 
   // Role-Based Access Control Map
   const rolePermissions: Record<UserRole, string[]> = {
-    [UserRole.SUPER_ADMIN]: ['dashboard', 'pos', 'inventory', 'clinical', 'finance', 'staff', 'branches', 'reports', 'settings'],
+    [UserRole.SUPER_ADMIN]: ['dashboard', 'approvals', 'pos', 'inventory', 'clinical', 'finance', 'staff', 'branches', 'reports', 'settings'],
     [UserRole.BRANCH_MANAGER]: ['dashboard', 'pos', 'inventory', 'clinical', 'finance', 'staff', 'reports'],
     [UserRole.PHARMACIST]: ['dashboard', 'inventory', 'clinical'],
     [UserRole.CASHIER]: ['pos', 'finance'],
@@ -46,6 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
 
   const allMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'approvals', label: 'Approvals', icon: ClipboardCheck },
     { id: 'pos', label: 'Point of Sale', icon: ShoppingCart },
     { id: 'inventory', label: 'Inventory', icon: Package },
     { id: 'clinical', label: 'Clinical & Rx', icon: Stethoscope },

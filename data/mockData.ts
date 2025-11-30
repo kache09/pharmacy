@@ -1,5 +1,5 @@
 
-import { Branch, Product, Sale, StockTransfer, Invoice, PaymentMethod, Staff, UserRole, Patient, Prescription, AuditLog, BranchInventoryItem } from '../types';
+import { Branch, Product, Sale, StockTransfer, Invoice, PaymentMethod, Staff, UserRole, Patient, Prescription, AuditLog, BranchInventoryItem, StockRequisition, Expense } from '../types';
 
 export const BRANCHES: Branch[] = [
   { id: 'HEAD_OFFICE', name: 'Head Office (Global View)', location: 'HQ', manager: 'Super Admin', status: 'ACTIVE' },
@@ -52,6 +52,39 @@ export const BRANCH_FINANCE_STATS = {
   'BR003': { revenue: 18000000, profit: 4500000, expenses: 1500000 },
   'BR004': { revenue: 12000000, profit: 3100000, expenses: 1000000 },
 };
+
+export const INITIAL_EXPENSES: Expense[] = [
+  { id: 1, category: 'Utilities', description: 'Electricity Bill (Luku)', amount: 150000, date: '2023-10-25', status: 'Approved', branchId: 'BR001' },
+  { id: 2, category: 'Supplies', description: 'Packaging Bags', amount: 45000, date: '2023-10-24', status: 'Pending', branchId: 'BR002' },
+  { id: 3, category: 'Maintenance', description: 'AC Repair', amount: 80000, date: '2023-10-23', status: 'Approved', branchId: 'BR001' },
+  { id: 4, category: 'Transport', description: 'Staff Transport Allowance', amount: 25000, date: '2023-10-23', status: 'Pending', branchId: 'BR003' },
+];
+
+export const MOCK_REQUISITIONS: StockRequisition[] = [
+  {
+    id: 'REQ-001',
+    branchId: 'BR002',
+    requestDate: '2023-10-27',
+    requestedBy: 'Sarah K',
+    status: 'PENDING',
+    priority: 'URGENT',
+    items: [
+      { productId: '2', productName: 'Augmentin 625mg', currentStock: 15, requestedQty: 100 },
+      { productId: '6', productName: 'Cetirizine', currentStock: 20, requestedQty: 500 },
+    ]
+  },
+  {
+    id: 'REQ-002',
+    branchId: 'BR004',
+    requestDate: '2023-10-26',
+    requestedBy: 'Rehema P',
+    status: 'PENDING',
+    priority: 'NORMAL',
+    items: [
+      { productId: '1', productName: 'Panadol Extra', currentStock: 60, requestedQty: 200 }
+    ]
+  }
+];
 
 export const WEEKLY_SALES_DATA = {
   'HEAD_OFFICE': [

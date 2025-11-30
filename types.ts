@@ -121,6 +121,22 @@ export interface StockTransfer {
   };
 }
 
+// Stock Requisition (Branch Requesting Stock)
+export interface StockRequisition {
+  id: string;
+  branchId: string;
+  requestDate: string;
+  requestedBy: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  priority: 'NORMAL' | 'URGENT';
+  items: {
+    productId: string;
+    productName: string;
+    currentStock: number;
+    requestedQty: number;
+  }[];
+}
+
 // Invoicing Types
 export interface InvoicePayment {
   id: string;
@@ -142,6 +158,16 @@ export interface Invoice {
   status: 'PAID' | 'PARTIAL' | 'UNPAID' | 'OVERDUE';
   description: string;
   payments: InvoicePayment[];
+}
+
+export interface Expense {
+  id: number;
+  category: string;
+  description: string;
+  amount: number;
+  date: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  branchId: string;
 }
 
 // Clinical Types

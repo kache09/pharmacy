@@ -6,9 +6,9 @@ import {
 } from 'recharts';
 import {
   DollarSign, TrendingUp, TrendingDown, Receipt, CreditCard,
-  FileText, Plus, Download, Filter, Wallet, Building, Calendar, CheckCircle, FilePlus, User
+  FileText, Plus, Download, Filter, Wallet, Building, Calendar, CheckCircle, FilePlus, User, X
 } from 'lucide-react';
-import { BRANCH_FINANCE_STATS, BRANCHES, WEEKLY_SALES_DATA, MOCK_INVOICES } from '../data/mockData';
+import { BRANCH_FINANCE_STATS, BRANCHES, WEEKLY_SALES_DATA, MOCK_INVOICES, INITIAL_EXPENSES } from '../data/mockData';
 import { Invoice, PaymentMethod } from '../types';
 
 const PAYMENT_METHODS_DATA = [
@@ -18,32 +18,38 @@ const PAYMENT_METHODS_DATA = [
   { name: 'Credit', value: 500000 },
 ];
 
-const EXPENSES_LIST = [
-  { id: 1, category: 'Utilities', description: 'Electricity Bill (Luku)', amount: 150000, date: '2023-10-25', status: 'Approved', branchId: 'BR001' },
-  { id: 2, category: 'Supplies', description: 'Packaging Bags', amount: 45000, date: '2023-10-24', status: 'Pending', branchId: 'BR002' },
-  { id: 3, category: 'Maintenance', description: 'AC Repair', amount: 80000, date: '2023-10-23', status: 'Approved', branchId: 'BR001' },
-  { id: 4, category: 'Transport', description: 'Staff Transport Allowance', amount: 25000, date: '2023-10-23', status: 'Approved', branchId: 'BR003' },
-];
-
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#64748b'];
 
 const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'expenses' | 'tax'>('overview');
+  
+  // Data State
   const [invoices, setInvoices] = useState<Invoice[]>(MOCK_INVOICES);
+  const [expenses, setExpenses] = useState(INITIAL_EXPENSES);
+  
+  // Modal State
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   // Form States
   const [newInvoice, setNewInvoice] = useState({ customer: '', amount: '', description: '', due: '' });
   const [newPayment, setNewPayment] = useState({ amount: '', receipt: '', method: PaymentMethod.CASH });
+  const [newExpense, setNewExpense] = useState({
+    description: '',
+    category: 'Utilities',
+    amount: '',
+    date: new Date().toISOString().split('T')[0]
+  });
 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
 
   // Filter Data Logic
   const stats = (BRANCH_FINANCE_STATS as any)[currentBranchId] || BRANCH_FINANCE_STATS['HEAD_OFFICE'];
   const chartData = (WEEKLY_SALES_DATA as any)[currentBranchId] || WEEKLY_SALES_DATA['BR001'];
-  const filteredExpenses = isHeadOffice ? EXPENSES_LIST : EXPENSES_LIST.filter(e => e.branchId === currentBranchId);
+  
+  const filteredExpenses = isHeadOffice ? expenses : expenses.filter(e => e.branchId === currentBranchId);
   const filteredInvoices = isHeadOffice ? invoices : invoices.filter(i => i.branchId === currentBranchId);
   const incomeVsExpenseData = chartData.map((d: any) => ({ ...d, expense: d.revenue * 0.7 })); // Mock logic
 
@@ -104,6 +110,31 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
     setShowPaymentModal(false);
     setSelectedInvoice(null);
     setNewPayment({ amount: '', receipt: '', method: PaymentMethod.CASH });
+  };
+
+  const handleRecordExpense = () => {
+    if (!newExpense.description || !newExpense.amount) return;
+
+    const expense = {
+      id: Date.now(),
+      category: newExpense.category,
+      description: newExpense.description,
+      amount: parseFloat(newExpense.amount),
+      date: newExpense.date,
+      status: 'Pending', // Default status is Pending for new expenses
+      branchId: currentBranchId
+    };
+
+    // @ts-ignore
+    setExpenses([expense, ...expenses]);
+    setShowExpenseModal(false);
+    setNewExpense({
+      description: '',
+      category: 'Utilities',
+      amount: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+    alert("Expense recorded successfully! It has been sent to Head Office for approval.");
   };
 
   return (
@@ -293,7 +324,10 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-slate-800">Operational Expenses</h3>
                 {!isHeadOffice && (
-                <button className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium text-sm shadow-md shadow-rose-600/20">
+                <button 
+                    onClick={() => setShowExpenseModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium text-sm shadow-md shadow-rose-600/20"
+                >
                     <Plus size={16} /> Record Expense
                 </button>
                 )}
@@ -318,7 +352,11 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                                 <td className="px-6 py-4 text-xs text-slate-500">{BRANCHES.find(b => b.id === exp.branchId)?.name}</td>
                                 <td className="px-6 py-4 font-bold text-slate-800">TZS {exp.amount.toLocaleString()}</td>
                                 <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${exp.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      exp.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 
+                                      exp.status === 'Rejected' ? 'bg-rose-100 text-rose-700' :
+                                      'bg-amber-100 text-amber-700'
+                                    }`}>
                                         {exp.status}
                                     </span>
                                 </td>
@@ -481,6 +519,80 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                     <button onClick={handleRecordPayment} className="px-4 py-2 bg-teal-600 text-white rounded-lg">Save Payment</button>
                 </div>
             </div>
+        </div>
+      )}
+
+      {/* Record Expense Modal */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-900">Record Expense</h3>
+              <button onClick={() => setShowExpenseModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700">Description</label>
+                <input 
+                  type="text" 
+                  className="w-full p-2 border border-slate-300 rounded-lg" 
+                  placeholder="e.g. Office Cleaning"
+                  value={newExpense.description}
+                  onChange={e => setNewExpense({...newExpense, description: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                   <label className="text-sm font-medium text-slate-700">Category</label>
+                   <select 
+                      className="w-full p-2 border border-slate-300 rounded-lg"
+                      value={newExpense.category}
+                      onChange={e => setNewExpense({...newExpense, category: e.target.value})}
+                   >
+                      <option>Utilities</option>
+                      <option>Supplies</option>
+                      <option>Maintenance</option>
+                      <option>Transport</option>
+                      <option>Salary/Wages</option>
+                      <option>Other</option>
+                   </select>
+                </div>
+                <div>
+                   <label className="text-sm font-medium text-slate-700">Amount (TZS)</label>
+                   <input 
+                      type="number" 
+                      className="w-full p-2 border border-slate-300 rounded-lg" 
+                      placeholder="0.00"
+                      value={newExpense.amount}
+                      onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
+                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">Date</label>
+                <input 
+                  type="date" 
+                  className="w-full p-2 border border-slate-300 rounded-lg"
+                  value={newExpense.date}
+                  onChange={e => setNewExpense({...newExpense, date: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button onClick={() => setShowExpenseModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-lg">Cancel</button>
+                <button 
+                  onClick={handleRecordExpense} 
+                  disabled={!newExpense.amount || !newExpense.description}
+                  className="px-6 py-2 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Submit for Approval
+                </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

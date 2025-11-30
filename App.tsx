@@ -11,6 +11,7 @@ import Staff from './components/Staff';
 import Clinical from './components/Clinical';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
+import Approvals from './components/Approvals';
 import { Staff as StaffType, UserRole } from './types';
 
 const App: React.FC = () => {
@@ -47,6 +48,8 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard currentBranchId={currentBranchId} />;
+      case 'approvals':
+        return <Approvals />;
       case 'pos':
         return <POS currentBranchId={currentBranchId} />;
       case 'inventory':
