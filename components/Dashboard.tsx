@@ -48,7 +48,13 @@ const StatCard = ({ title, value, subtext, icon: Icon, color }: any) => (
   </div>
 );
 
-const Dashboard: React.FC<{currentBranchId: string, inventory: Record<string, BranchInventoryItem[]>}> = ({ currentBranchId, inventory }) => {
+interface DashboardProps {
+  currentBranchId: string;
+  inventory: Record<string, BranchInventoryItem[]>;
+  onViewInventory: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onViewInventory }) => {
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   
   // Dynamic Data Selection based on Branch Context
@@ -201,7 +207,7 @@ const Dashboard: React.FC<{currentBranchId: string, inventory: Record<string, Br
           <h3 className="text-lg font-bold text-slate-800">
              {isHeadOffice ? 'Critical Stock Alerts (Real-time)' : 'Branch Stock Alerts'}
           </h3>
-          <button className="text-teal-600 text-sm font-medium hover:underline">View All Inventory</button>
+          <button onClick={onViewInventory} className="text-teal-600 text-sm font-medium hover:underline">View All Inventory</button>
         </div>
         <table className="w-full text-left text-sm text-slate-600">
           <thead className="bg-slate-50 text-slate-700 font-semibold uppercase text-xs">

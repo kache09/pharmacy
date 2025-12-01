@@ -67,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-teal-900 text-white shadow-xl">
         <div className="p-6 border-b border-teal-800">
-          <h1 className="text-2xl font-bold tracking-tight">AfyaTrack<span className="text-teal-400">.</span></h1>
+          <h1 className="text-2xl font-bold tracking-tight">PMS<span className="text-teal-400">.</span></h1>
           <p className="text-xs text-teal-300 mt-1">Pharmacy Management</p>
         </div>
 
@@ -144,7 +144,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="md:hidden flex items-center justify-between p-4 bg-teal-900 text-white shadow-md z-20">
           <div>
-            <h1 className="text-xl font-bold">AfyaTrack</h1>
+            <h1 className="text-xl font-bold">PMS</h1>
             <p className="text-xs text-teal-300">{activeBranchName}</p>
           </div>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>

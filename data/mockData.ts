@@ -4,20 +4,39 @@ import { Branch, Product, Sale, StockTransfer, Invoice, PaymentMethod, Staff, Us
 export const BRANCHES: Branch[] = [
   { id: 'HEAD_OFFICE', name: 'Head Office (Global View)', location: 'HQ', manager: 'Super Admin', status: 'ACTIVE' },
   { id: 'BR001', name: 'Kariakoo Branch', location: 'Ilala, Dar es Salaam', manager: 'Juma M', status: 'ACTIVE' },
-  { id: 'BR002', name: 'Masaki Branch', location: 'Kinondoni, Dar es Salaam', manager: 'Sarah K', status: 'ACTIVE' },
-  { id: 'BR003', name: 'Mbezi Beach', location: 'Kinondoni, Dar es Salaam', manager: 'David L', status: 'INACTIVE' },
+  { id: 'BR002', name: 'Masaki Branch', location: 'Kinondoni, Dar es Salaam', manager: 'Michael T', status: 'ACTIVE' },
+  { id: 'BR003', name: 'Mbezi Beach', location: 'Kinondoni, Dar es Salaam', manager: 'Robert F', status: 'ACTIVE' },
   { id: 'BR004', name: 'Dodoma Plaza', location: 'Dodoma CBD', manager: 'Rehema P', status: 'ACTIVE' },
 ];
 
 export const STAFF_LIST: Staff[] = [
-  { id: 'ST-001', name: 'Dr. Amani', role: UserRole.SUPER_ADMIN, branchId: 'HEAD_OFFICE', email: 'amani@afyatrack.co.tz', phone: '+255 700 000 001', status: 'ACTIVE', joinedDate: '2022-01-01', lastLogin: 'Just now', username: 'admin', password: '123' },
-  { id: 'ST-002', name: 'Juma M', role: UserRole.BRANCH_MANAGER, branchId: 'BR001', email: 'juma@afyatrack.co.tz', phone: '+255 712 345 678', status: 'ACTIVE', joinedDate: '2022-03-15', lastLogin: '2 hrs ago', username: 'juma', password: '123' },
-  { id: 'ST-003', name: 'Sarah K', role: UserRole.PHARMACIST, branchId: 'BR002', email: 'sarah@afyatrack.co.tz', phone: '+255 755 123 456', status: 'ACTIVE', joinedDate: '2022-06-10', lastLogin: '5 hrs ago', username: 'sarah', password: '123' },
-  { id: 'ST-004', name: 'David L', role: UserRole.INVENTORY_CONTROLLER, branchId: 'HEAD_OFFICE', email: 'david@afyatrack.co.tz', phone: '+255 655 987 654', status: 'ACTIVE', joinedDate: '2023-01-20', lastLogin: '1 day ago', username: 'david', password: '123' },
-  { id: 'ST-005', name: 'Grace P', role: UserRole.CASHIER, branchId: 'BR001', email: 'grace@afyatrack.co.tz', phone: '+255 688 111 222', status: 'ACTIVE', joinedDate: '2023-05-12', lastLogin: '10 mins ago', username: 'grace', password: '123' },
-  { id: 'ST-006', name: 'Hassan A', role: UserRole.ACCOUNTANT, branchId: 'HEAD_OFFICE', email: 'hassan@afyatrack.co.tz', phone: '+255 777 333 444', status: 'ACTIVE', joinedDate: '2023-02-01', lastLogin: '3 days ago', username: 'hassan', password: '123' },
-  { id: 'ST-007', name: 'Rehema P', role: UserRole.BRANCH_MANAGER, branchId: 'BR004', email: 'rehema@afyatrack.co.tz', phone: '+255 713 555 666', status: 'ACTIVE', joinedDate: '2023-08-01', lastLogin: '1 hr ago', username: 'rehema', password: '123' },
-  { id: 'ST-008', name: 'John D', role: UserRole.PHARMACIST, branchId: 'BR001', email: 'john@afyatrack.co.tz', phone: '+255 766 888 999', status: 'INACTIVE', joinedDate: '2022-11-15', lastLogin: '2 weeks ago', username: 'john', password: '123' },
+  // --- HEAD OFFICE ---
+  { id: 'ST-HO-01', name: 'Dr. Amani', role: UserRole.SUPER_ADMIN, branchId: 'HEAD_OFFICE', email: 'admin@pms.co.tz', phone: '+255 700 000 001', status: 'ACTIVE', joinedDate: '2022-01-01', lastLogin: 'Just now', username: 'admin', password: '123' },
+  { id: 'ST-HO-02', name: 'Hassan A', role: UserRole.ACCOUNTANT, branchId: 'HEAD_OFFICE', email: 'hassan@pms.co.tz', phone: '+255 777 333 444', status: 'ACTIVE', joinedDate: '2023-02-01', lastLogin: '3 days ago', username: 'hassan', password: '123' },
+  { id: 'ST-HO-03', name: 'David L', role: UserRole.INVENTORY_CONTROLLER, branchId: 'HEAD_OFFICE', email: 'david@pms.co.tz', phone: '+255 655 987 654', status: 'ACTIVE', joinedDate: '2023-01-20', lastLogin: '1 day ago', username: 'david', password: '123' },
+
+  // --- BR001: KARIAKOO ---
+  { id: 'ST-BR1-01', name: 'Juma M', role: UserRole.BRANCH_MANAGER, branchId: 'BR001', email: 'juma@pms.co.tz', phone: '+255 712 345 678', status: 'ACTIVE', joinedDate: '2022-03-15', lastLogin: '2 hrs ago', username: 'manager_br1', password: '123' },
+  { id: 'ST-BR1-02', name: 'Alice B', role: UserRole.ACCOUNTANT, branchId: 'BR001', email: 'alice@pms.co.tz', phone: '+255 712 111 222', status: 'ACTIVE', joinedDate: '2023-05-10', lastLogin: '1 day ago', username: 'acct_br1', password: '123' },
+  { id: 'ST-BR1-03', name: 'Peter K', role: UserRole.INVENTORY_CONTROLLER, branchId: 'BR001', email: 'peter@pms.co.tz', phone: '+255 712 333 444', status: 'ACTIVE', joinedDate: '2023-06-15', lastLogin: '5 hrs ago', username: 'inv_br1', password: '123' },
+  { id: 'ST-BR1-04', name: 'Grace P', role: UserRole.CASHIER, branchId: 'BR001', email: 'grace@pms.co.tz', phone: '+255 688 111 222', status: 'ACTIVE', joinedDate: '2023-05-12', lastLogin: '10 mins ago', username: 'cashier_br1', password: '123' },
+  { id: 'ST-BR1-05', name: 'John D', role: UserRole.PHARMACIST, branchId: 'BR001', email: 'john@pms.co.tz', phone: '+255 766 888 999', status: 'INACTIVE', joinedDate: '2022-11-15', lastLogin: '2 weeks ago', username: 'john', password: '123' },
+
+  // --- BR002: MASAKI ---
+  { id: 'ST-BR2-01', name: 'Michael T', role: UserRole.BRANCH_MANAGER, branchId: 'BR002', email: 'michael@pms.co.tz', phone: '+255 754 111 000', status: 'ACTIVE', joinedDate: '2023-01-10', lastLogin: '4 hrs ago', username: 'manager_br2', password: '123' },
+  { id: 'ST-BR2-02', name: 'Linda W', role: UserRole.ACCOUNTANT, branchId: 'BR002', email: 'linda@pms.co.tz', phone: '+255 754 222 000', status: 'ACTIVE', joinedDate: '2023-02-20', lastLogin: '2 days ago', username: 'acct_br2', password: '123' },
+  { id: 'ST-BR2-03', name: 'Kevin J', role: UserRole.INVENTORY_CONTROLLER, branchId: 'BR002', email: 'kevin@pms.co.tz', phone: '+255 754 333 000', status: 'ACTIVE', joinedDate: '2023-03-05', lastLogin: '1 hr ago', username: 'inv_br2', password: '123' },
+  { id: 'ST-BR2-04', name: 'Sarah K', role: UserRole.PHARMACIST, branchId: 'BR002', email: 'sarah@pms.co.tz', phone: '+255 755 123 456', status: 'ACTIVE', joinedDate: '2022-06-10', lastLogin: '5 hrs ago', username: 'sarah', password: '123' },
+
+  // --- BR003: MBEZI BEACH ---
+  { id: 'ST-BR3-01', name: 'Robert F', role: UserRole.BRANCH_MANAGER, branchId: 'BR003', email: 'robert@pms.co.tz', phone: '+255 784 111 000', status: 'ACTIVE', joinedDate: '2023-07-01', lastLogin: '10 mins ago', username: 'manager_br3', password: '123' },
+  { id: 'ST-BR3-02', name: 'Nancy G', role: UserRole.ACCOUNTANT, branchId: 'BR003', email: 'nancy@pms.co.tz', phone: '+255 784 222 000', status: 'ACTIVE', joinedDate: '2023-07-05', lastLogin: '1 day ago', username: 'acct_br3', password: '123' },
+  { id: 'ST-BR3-03', name: 'Brian H', role: UserRole.INVENTORY_CONTROLLER, branchId: 'BR003', email: 'brian@pms.co.tz', phone: '+255 784 333 000', status: 'ACTIVE', joinedDate: '2023-07-10', lastLogin: '3 hrs ago', username: 'inv_br3', password: '123' },
+
+  // --- BR004: DODOMA PLAZA ---
+  { id: 'ST-BR4-01', name: 'Rehema P', role: UserRole.BRANCH_MANAGER, branchId: 'BR004', email: 'rehema@pms.co.tz', phone: '+255 713 555 666', status: 'ACTIVE', joinedDate: '2023-08-01', lastLogin: '1 hr ago', username: 'manager_br4', password: '123' },
+  { id: 'ST-BR4-02', name: 'Joseph L', role: UserRole.ACCOUNTANT, branchId: 'BR004', email: 'joseph@pms.co.tz', phone: '+255 713 777 888', status: 'ACTIVE', joinedDate: '2023-08-10', lastLogin: '6 hrs ago', username: 'acct_br4', password: '123' },
+  { id: 'ST-BR4-03', name: 'Daniel M', role: UserRole.INVENTORY_CONTROLLER, branchId: 'BR004', email: 'daniel@pms.co.tz', phone: '+255 713 999 000', status: 'ACTIVE', joinedDate: '2023-08-15', lastLogin: '2 days ago', username: 'inv_br4', password: '123' },
 ];
 
 export const PRODUCTS: Product[] = [
@@ -210,12 +229,12 @@ export const MOCK_PRESCRIPTIONS: Prescription[] = [
 
 export const MOCK_AUDIT_LOGS: AuditLog[] = [
   { id: 'LOG-9001', userId: 'ST-002', userName: 'Juma M', action: 'LOGIN', details: 'Successful login from Web Client', timestamp: '2023-10-27 08:00:15', branchId: 'BR001', severity: 'INFO' },
-  { id: 'LOG-9002', userId: 'ST-005', userName: 'Grace P', action: 'SALE_COMPLETE', details: 'Processed Sale #SALE-921 (Amount: 15,000 TZS)', timestamp: '2023-10-27 08:15:30', branchId: 'BR001', severity: 'INFO' },
-  { id: 'LOG-9003', userId: 'ST-001', userName: 'Dr. Amani', action: 'PRICE_UPDATE', details: 'Updated price for Panadol Extra (4,500 -> 5,000)', timestamp: '2023-10-27 09:30:00', branchId: 'HEAD_OFFICE', severity: 'WARNING' },
-  { id: 'LOG-9004', userId: 'ST-003', userName: 'Sarah K', action: 'STOCK_ADJUSTMENT', details: 'Removed 2 boxes of Cipro (Damaged)', timestamp: '2023-10-27 10:45:12', branchId: 'BR002', severity: 'WARNING' },
-  { id: 'LOG-9005', userId: 'ST-002', userName: 'Juma M', action: 'INVOICE_CREATE', details: 'Created Invoice #INV-2023-001', timestamp: '2023-10-27 11:20:05', branchId: 'BR001', severity: 'INFO' },
+  { id: 'LOG-9002', userId: 'ST-BR1-04', userName: 'Grace P', action: 'SALE_COMPLETE', details: 'Processed Sale #SALE-921 (Amount: 15,000 TZS)', timestamp: '2023-10-27 08:15:30', branchId: 'BR001', severity: 'INFO' },
+  { id: 'LOG-9003', userId: 'ST-HO-01', userName: 'Dr. Amani', action: 'PRICE_UPDATE', details: 'Updated price for Panadol Extra (4,500 -> 5,000)', timestamp: '2023-10-27 09:30:00', branchId: 'HEAD_OFFICE', severity: 'WARNING' },
+  { id: 'LOG-9004', userId: 'ST-BR2-04', userName: 'Sarah K', action: 'STOCK_ADJUSTMENT', details: 'Removed 2 boxes of Cipro (Damaged)', timestamp: '2023-10-27 10:45:12', branchId: 'BR002', severity: 'WARNING' },
+  { id: 'LOG-9005', userId: 'ST-BR1-01', userName: 'Juma M', action: 'INVOICE_CREATE', details: 'Created Invoice #INV-2023-001', timestamp: '2023-10-27 11:20:05', branchId: 'BR001', severity: 'INFO' },
   { id: 'LOG-9006', userId: 'SYSTEM', userName: 'System Bot', action: 'AUTO_BACKUP', details: 'Daily Database Backup Completed', timestamp: '2023-10-27 00:00:00', branchId: 'HEAD_OFFICE', severity: 'INFO' },
-  { id: 'LOG-9007', userId: 'ST-005', userName: 'Grace P', action: 'LOGIN_FAILED', details: 'Incorrect Password Attempt (3x)', timestamp: '2023-10-27 07:55:00', branchId: 'BR001', severity: 'CRITICAL' },
+  { id: 'LOG-9007', userId: 'ST-BR1-04', userName: 'Grace P', action: 'LOGIN_FAILED', details: 'Incorrect Password Attempt (3x)', timestamp: '2023-10-27 07:55:00', branchId: 'BR001', severity: 'CRITICAL' },
 ];
 
 export const CATEGORY_PERFORMANCE = [

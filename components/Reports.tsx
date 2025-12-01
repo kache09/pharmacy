@@ -93,7 +93,7 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory }) => {
 
     let dataToExport: any[] = [];
     const dateStr = new Date().toISOString().split('T')[0];
-    const filename = `AfyaTrack_${activeTab}_Report_${branchName?.replace(/\s+/g, '_')}_${dateStr}.csv`;
+    const filename = `PMS_${activeTab}_Report_${branchName?.replace(/\s+/g, '_')}_${dateStr}.csv`;
 
     if (activeTab === 'finance') {
         dataToExport = salesData.map((d: any) => ({

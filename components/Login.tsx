@@ -47,7 +47,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <div className="w-12 h-12 bg-teal-600 rounded-xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-teal-600/20">
               <Lock className="text-white" size={24} />
             </div>
-            <h1 className="text-2xl font-bold text-slate-800">AfyaTrack Login</h1>
+            <h1 className="text-2xl font-bold text-slate-800">PMS Login</h1>
             <p className="text-slate-500 text-sm mt-1">Pharmacy Management System</p>
           </div>
 

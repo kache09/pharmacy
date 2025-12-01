@@ -60,7 +60,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard currentBranchId={currentBranchId} inventory={inventory} />;
+        return <Dashboard currentBranchId={currentBranchId} inventory={inventory} onViewInventory={() => setActiveTab('inventory')} />;
       case 'approvals':
         return <Approvals />;
       case 'pos':
@@ -95,7 +95,7 @@ const App: React.FC = () => {
       case 'settings':
         return <Settings currentBranchId={currentBranchId} />;
       default:
-        return <Dashboard currentBranchId={currentBranchId} inventory={inventory} />;
+        return <Dashboard currentBranchId={currentBranchId} inventory={inventory} onViewInventory={() => setActiveTab('inventory')} />;
     }
   };
 

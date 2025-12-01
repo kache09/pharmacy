@@ -25,7 +25,7 @@ const Settings: React.FC<{ currentBranchId: string }> = ({ currentBranchId }) =>
 
   // Mock State
   const [general, setGeneral] = useState({
-    companyName: 'AfyaTrack Pharmacy Ltd',
+    companyName: 'PMS Pharmacy Ltd',
     tinNumber: '123-456-789',
     vrnNumber: '400-999-111',
     address: 'Plot 45, Bagamoyo Road, Dar es Salaam',
@@ -46,7 +46,7 @@ const Settings: React.FC<{ currentBranchId: string }> = ({ currentBranchId }) =>
     expiryAlertSms: true,
     dailyReportSms: false,
     systemUpdates: true,
-    emailRecipients: 'admin@afyatrack.co.tz, manager@afyatrack.co.tz'
+    emailRecipients: 'admin@pms.co.tz, manager@pms.co.tz'
   });
 
   const [integrations, setIntegrations] = useState({

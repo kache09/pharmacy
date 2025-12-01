@@ -320,7 +320,7 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                         <input 
                             type="email" 
                             className="w-full pl-9 p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" 
-                            placeholder="employee@afyatrack.co.tz" 
+                            placeholder="employee@pms.co.tz" 
                             value={newStaff.email}
                             onChange={(e) => setNewStaff({...newStaff, email: e.target.value})}
                         />
