@@ -91,7 +91,7 @@ const App: React.FC = () => {
       case 'clinical':
         return <Clinical currentBranchId={currentBranchId} />;
       case 'reports':
-        return <Reports currentBranchId={currentBranchId} />;
+        return <Reports currentBranchId={currentBranchId} inventory={inventory} />;
       case 'settings':
         return <Settings currentBranchId={currentBranchId} />;
       default:

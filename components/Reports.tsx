@@ -23,13 +23,19 @@ import {
   WEEKLY_SALES_DATA, 
   BRANCH_FINANCE_STATS, 
   MOCK_AUDIT_LOGS,
-  CATEGORY_PERFORMANCE
+  CATEGORY_PERFORMANCE,
+  PRODUCTS
 } from '../data/mockData';
-import { AuditLog } from '../types';
+import { AuditLog, BranchInventoryItem } from '../types';
 
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#f43f5e', '#64748b'];
 
-const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
+interface ReportsProps {
+  currentBranchId: string;
+  inventory: Record<string, BranchInventoryItem[]>;
+}
+
+const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory }) => {
   const [activeTab, setActiveTab] = useState<'finance' | 'inventory' | 'audit'>('finance');
   const [auditFilter, setAuditFilter] = useState('');
   
@@ -48,8 +54,101 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
       return matchBranch && matchSearch;
   });
 
+  const downloadCSV = (data: any[], filename: string) => {
+    if (!data || data.length === 0) {
+      alert("No data available to export.");
+      return;
+    }
+
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(fieldName => {
+        const value = row[fieldName];
+        // Handle strings that might contain commas
+        return typeof value === 'string' && value.includes(',') 
+          ? `"${value}"` 
+          : JSON.stringify(value, (_, v) => v === null ? '' : v);
+      }).join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const handleExport = (format: string) => {
-    alert(`Generating ${format} report for ${branchName}...`);
+    if (format === 'PDF') {
+        window.print();
+        return;
+    }
+
+    let dataToExport: any[] = [];
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `AfyaTrack_${activeTab}_Report_${branchName?.replace(/\s+/g, '_')}_${dateStr}.csv`;
+
+    if (activeTab === 'finance') {
+        dataToExport = salesData.map((d: any) => ({
+            Date: dateStr, 
+            Day: d.name,
+            Sales_Count: d.sales / 1000, // Mock calculation
+            Revenue_TZS: d.revenue,
+            Branch: branchName
+        }));
+        // Append summary row
+        dataToExport.push({});
+        dataToExport.push({
+            Day: 'TOTAL_SUMMARY',
+            Revenue_TZS: financeStats.revenue,
+            Profit_TZS: financeStats.profit,
+            Expenses_TZS: financeStats.expenses
+        });
+    } else if (activeTab === 'inventory') {
+        // Build flat inventory list from props
+        const branchesToExport = isHeadOffice ? Object.keys(inventory) : [currentBranchId];
+        
+        branchesToExport.forEach(bId => {
+             const bName = BRANCHES.find(b => b.id === bId)?.name;
+             const items = inventory[bId] || [];
+             items.forEach(item => {
+                 const product = PRODUCTS.find(p => p.id === item.productId);
+                 if (product) {
+                     dataToExport.push({
+                         Branch: bName,
+                         Product_ID: product.id,
+                         Product_Name: product.name,
+                         Generic_Name: product.genericName,
+                         Category: product.category,
+                         Quantity: item.quantity,
+                         Unit: product.unit,
+                         Selling_Price: item.customPrice || product.price,
+                         Total_Value: item.quantity * (item.customPrice || product.price),
+                         Batches: item.batches.map(b => `${b.batchNumber}(${b.expiryDate})`).join('; ')
+                     });
+                 }
+             });
+        });
+    } else if (activeTab === 'audit') {
+        dataToExport = filteredAuditLogs.map(log => ({
+            ID: log.id,
+            Timestamp: log.timestamp,
+            User: log.userName,
+            Action: log.action,
+            Details: log.details,
+            Branch: BRANCHES.find(b => b.id === log.branchId)?.name || log.branchId,
+            Severity: log.severity
+        }));
+    }
+
+    downloadCSV(dataToExport, filename);
   };
 
   return (
@@ -62,16 +161,16 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
              {isHeadOffice ? 'Global Intelligence Hub' : `Performance Reports for ${branchName}`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
             <button 
                 onClick={() => handleExport('PDF')}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm shadow-sm transition-colors"
             >
                 <Download size={16} /> Export PDF
             </button>
             <button 
                 onClick={() => handleExport('Excel')}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm shadow-sm transition-colors"
             >
                 <FileBarChart size={16} /> Export Excel
             </button>
@@ -79,7 +178,7 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit no-print">
           <button 
               onClick={() => setActiveTab('finance')}
               className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'finance' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -127,7 +226,7 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Revenue Trend */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 break-inside-avoid">
                         <h4 className="font-bold text-slate-800 mb-6">Revenue Trend (7 Days)</h4>
                         <div className="h-72">
                             <ResponsiveContainer width="100%" height="100%">
@@ -152,7 +251,7 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                     </div>
 
                     {/* Category Performance */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 break-inside-avoid">
                         <h4 className="font-bold text-slate-800 mb-6">Sales by Category</h4>
                         <div className="h-72 flex items-center justify-center">
                             <ResponsiveContainer width="100%" height="100%">
@@ -184,7 +283,7 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
           {activeTab === 'inventory' && (
              <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 break-inside-avoid">
                         <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                              <AlertTriangle size={20} className="text-amber-500" /> Expiry Risk Forecast
                         </h4>
@@ -215,7 +314,7 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                         </table>
                     </div>
 
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 break-inside-avoid">
                          <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                              <TrendingUp size={20} className="text-teal-600" /> Valuation Summary
                         </h4>
@@ -231,7 +330,7 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                             </div>
                             <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
                                 <div>
-                                    <p className="text-sm text-slate-500">Dead Stock (Non-moving > 6mo)</p>
+                                    <p className="text-sm text-slate-500">Dead Stock (Non-moving &gt; 6mo)</p>
                                     <p className="text-xl font-bold text-slate-800">1,200,000 TZS</p>
                                 </div>
                                 <div className="h-10 w-10 bg-white rounded-full flex items-center justify-center shadow-sm text-rose-600">
@@ -247,7 +346,7 @@ const Reports: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
           {/* AUDIT TAB */}
           {activeTab === 'audit' && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 flex gap-4">
+                  <div className="p-4 border-b border-slate-100 flex gap-4 no-print">
                       <div className="relative flex-1">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                           <input 

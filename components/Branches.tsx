@@ -4,11 +4,14 @@ import {
   Plus, 
   MapPin, 
   Users, 
-  MoreVertical, 
   CheckCircle, 
   XCircle,
   Building,
-  RefreshCcw
+  RefreshCcw,
+  Edit,
+  Power,
+  Save,
+  X
 } from 'lucide-react';
 import { BRANCHES } from '../data/mockData';
 import { Branch } from '../types';
@@ -16,10 +19,55 @@ import { Branch } from '../types';
 const Branches: React.FC = () => {
   const [branches, setBranches] = useState<Branch[]>(BRANCHES.filter(b => b.id !== 'HEAD_OFFICE'));
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  
+  // State for editing
+  const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
+  const [formData, setFormData] = useState<Partial<Branch>>({});
 
   // Stats
   const activeBranches = branches.filter(b => b.status === 'ACTIVE').length;
   const totalStaff = 34; // Mock
+
+  const handleEditClick = (branch: Branch) => {
+    setCurrentBranch(branch);
+    setFormData(branch);
+    setShowEditModal(true);
+  };
+
+  const handleToggleStatus = (id: string) => {
+    setBranches(prev => prev.map(b => {
+      if (b.id === id) {
+        return { ...b, status: b.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' };
+      }
+      return b;
+    }));
+  };
+
+  const handleSaveEdit = () => {
+    if (!currentBranch || !formData.name) return;
+    
+    setBranches(prev => prev.map(b => 
+      b.id === currentBranch.id ? { ...b, ...formData } as Branch : b
+    ));
+    setShowEditModal(false);
+    setCurrentBranch(null);
+  };
+
+  const handleAddBranch = () => {
+     // Mock addition
+     const newId = `BR00${branches.length + 5}`;
+     const newBranch: Branch = {
+         id: newId,
+         name: formData.name || 'New Branch',
+         location: formData.location || 'Unknown',
+         manager: formData.manager || 'Unassigned',
+         status: 'ACTIVE'
+     };
+     setBranches([...branches, newBranch]);
+     setShowAddModal(false);
+     setFormData({});
+  };
 
   return (
     <div className="space-y-6">
@@ -29,7 +77,7 @@ const Branches: React.FC = () => {
           <p className="text-slate-500 mt-1">Configure locations, managers, and operational status.</p>
         </div>
         <button 
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { setFormData({}); setShowAddModal(true); }}
           className="flex items-center gap-2 px-5 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold shadow-lg shadow-teal-600/20 transition-all"
         >
           <Plus size={20} /> Add New Branch
@@ -115,9 +163,26 @@ const Branches: React.FC = () => {
                      2 mins ago
                    </td>
                    <td className="px-6 py-4">
-                      <button className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
-                        <MoreVertical size={16} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleEditClick(branch)}
+                          className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-teal-600 hover:border-teal-200 hover:bg-teal-50 transition-colors"
+                          title="Edit Details"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleToggleStatus(branch.id)}
+                          className={`p-2 bg-white border border-slate-200 rounded-lg transition-colors ${
+                              branch.status === 'ACTIVE' 
+                              ? 'text-rose-500 hover:bg-rose-50 hover:border-rose-200' 
+                              : 'text-emerald-500 hover:bg-emerald-50 hover:border-emerald-200'
+                          }`}
+                          title={branch.status === 'ACTIVE' ? "Deactivate Branch" : "Activate Branch"}
+                        >
+                          <Power size={16} />
+                        </button>
+                      </div>
                    </td>
                 </tr>
               ))}
@@ -125,35 +190,63 @@ const Branches: React.FC = () => {
         </table>
       </div>
 
-      {/* Add Branch Modal */}
-      {showAddModal && (
+      {/* Add/Edit Branch Modal */}
+      {(showAddModal || showEditModal) && (
          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-               <div className="p-6 border-b border-slate-100">
-                  <h3 className="text-xl font-bold text-slate-900">Add New Branch</h3>
-                  <p className="text-slate-500 text-sm">Create a new location for the pharmacy chain.</p>
+               <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">{showEditModal ? 'Edit Branch' : 'Add New Branch'}</h3>
+                    <p className="text-slate-500 text-sm">{showEditModal ? `Update details for ${currentBranch?.name}` : 'Create a new location'}</p>
+                  </div>
+                  <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="text-slate-400 hover:text-slate-600">
+                    <X size={24} />
+                  </button>
                </div>
                <div className="p-6 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Branch Name</label>
-                    <input type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. Arusha City Center" />
+                    <input 
+                      type="text" 
+                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" 
+                      placeholder="e.g. Arusha City Center"
+                      value={formData.name || ''}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Location / Address</label>
-                    <input type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="Street, District, Region" />
+                    <input 
+                      type="text" 
+                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none" 
+                      placeholder="Street, District, Region"
+                      value={formData.location || ''}
+                      onChange={(e) => setFormData({...formData, location: e.target.value})}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Assign Manager</label>
-                    <select className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
-                       <option>Select Staff Member</option>
-                       <option>John Doe</option>
-                       <option>Jane Smith</option>
+                    <select 
+                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                      value={formData.manager || ''}
+                      onChange={(e) => setFormData({...formData, manager: e.target.value})}
+                    >
+                       <option value="">Select Staff Member</option>
+                       <option value="John Doe">John Doe</option>
+                       <option value="Jane Smith">Jane Smith</option>
+                       <option value="Juma M">Juma M</option>
+                       <option value="Sarah K">Sarah K</option>
                     </select>
                   </div>
                </div>
                <div className="p-6 bg-slate-50 flex justify-end gap-3">
-                  <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
-                  <button onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-teal-600 text-white font-medium hover:bg-teal-700 rounded-lg shadow-sm">Create Branch</button>
+                  <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
+                  <button 
+                    onClick={showEditModal ? handleSaveEdit : handleAddBranch} 
+                    className="px-4 py-2 bg-teal-600 text-white font-medium hover:bg-teal-700 rounded-lg shadow-sm flex items-center gap-2"
+                  >
+                    <Save size={18} /> {showEditModal ? 'Save Changes' : 'Create Branch'}
+                  </button>
                </div>
             </div>
          </div>

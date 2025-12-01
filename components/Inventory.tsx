@@ -24,7 +24,9 @@ import {
   Send,
   Trash2,
   Tag,
-  FilePlus
+  FilePlus,
+  History,
+  User
 } from 'lucide-react';
 import { BRANCHES, PRODUCTS, STAFF_LIST } from '../data/mockData';
 import { StockTransfer, Product, UserRole, BranchInventoryItem } from '../types';
@@ -53,6 +55,7 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false); 
   const [showPriceModal, setShowPriceModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ExtendedProduct | null>(null);
 
   // Verification Modal State
@@ -193,6 +196,11 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
       setSelectedItem(item);
       setPriceUpdate({ newPrice: (item.customPrice || item.price).toString() });
       setShowPriceModal(true);
+  };
+
+  const handleViewLog = (item: ExtendedProduct) => {
+    setSelectedItem(item);
+    setShowHistoryModal(true);
   };
 
   // Workflow Handlers
@@ -489,8 +497,11 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                         </td>
                         <td className="px-6 py-4 text-sm">
                             {isHeadOffice ? (
-                                <button className="text-slate-400 font-medium hover:text-teal-600 text-xs flex items-center gap-1">
-                                    <ClipboardCheck size={14} /> View Log
+                                <button 
+                                  onClick={() => handleViewLog(product)}
+                                  className="text-slate-500 border border-slate-200 px-2 py-1 rounded bg-white font-medium hover:text-teal-600 hover:border-teal-200 text-xs flex items-center gap-1 transition-colors shadow-sm"
+                                >
+                                    <History size={14} /> View History
                                 </button>
                             ) : (
                                 <div className="flex flex-col gap-2">
@@ -635,6 +646,67 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                  })
              )}
         </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && selectedItem && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <div>
+                          <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                             <History className="text-teal-600" /> Stock History
+                          </h3>
+                          <p className="text-slate-500 text-sm">{selectedItem.name} ({selectedItem.genericName})</p>
+                      </div>
+                      <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                  </div>
+                  
+                  <div className="p-0 overflow-y-auto max-h-[60vh]">
+                      <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                              <tr>
+                                  <th className="px-6 py-3">Date/Time</th>
+                                  <th className="px-6 py-3">Action</th>
+                                  <th className="px-6 py-3">User</th>
+                                  <th className="px-6 py-3 text-right">Qty Change</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {/* Mock History Data */}
+                              <tr className="hover:bg-slate-50">
+                                  <td className="px-6 py-3 text-slate-600">2023-10-27 10:30</td>
+                                  <td className="px-6 py-3"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">Sale</span></td>
+                                  <td className="px-6 py-3 text-slate-500">Grace P (Cashier)</td>
+                                  <td className="px-6 py-3 text-right font-bold text-rose-600">-2</td>
+                              </tr>
+                              <tr className="hover:bg-slate-50">
+                                  <td className="px-6 py-3 text-slate-600">2023-10-26 14:15</td>
+                                  <td className="px-6 py-3"><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">Transfer In</span></td>
+                                  <td className="px-6 py-3 text-slate-500">Juma M (Manager)</td>
+                                  <td className="px-6 py-3 text-right font-bold text-emerald-600">+100</td>
+                              </tr>
+                              <tr className="hover:bg-slate-50">
+                                  <td className="px-6 py-3 text-slate-600">2023-10-20 09:00</td>
+                                  <td className="px-6 py-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-bold">Adjustment</span></td>
+                                  <td className="px-6 py-3 text-slate-500">Sarah K (Admin)</td>
+                                  <td className="px-6 py-3 text-right font-bold text-rose-600">-1 (Damaged)</td>
+                              </tr>
+                              <tr className="hover:bg-slate-50">
+                                  <td className="px-6 py-3 text-slate-600">2023-10-01 08:00</td>
+                                  <td className="px-6 py-3"><span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-bold">Initial Stock</span></td>
+                                  <td className="px-6 py-3 text-slate-500">System</td>
+                                  <td className="px-6 py-3 text-right font-bold text-emerald-600">+50</td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
+                  
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 text-center text-xs text-slate-500">
+                      Showing last 4 transactions for this item across all active batches.
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* Add Stock Modal - Unchanged */}
