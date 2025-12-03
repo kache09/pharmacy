@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
+import { Lock, AlertTriangle } from 'lucide-react';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -11,8 +13,8 @@ import Clinical from './components/Clinical';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Approvals from './components/Approvals';
-import { Staff as StaffType, UserRole, BranchInventoryItem, StockTransfer, Sale, Invoice, CartItem, PaymentMethod, StockReleaseRequest, StockRequisition, DisposalRequest, Expense } from './types';
-import { BRANCH_INVENTORY, STOCK_TRANSFERS, MOCK_INVOICES, MOCK_REQUISITIONS, INITIAL_EXPENSES, MOCK_SALES } from './data/mockData';
+import { Staff as StaffType, UserRole, BranchInventoryItem, StockTransfer, Sale, Invoice, CartItem, PaymentMethod, StockReleaseRequest, StockRequisition, DisposalRequest, Expense, Branch } from './types';
+import { BRANCH_INVENTORY, STOCK_TRANSFERS, MOCK_INVOICES, MOCK_REQUISITIONS, INITIAL_EXPENSES, MOCK_SALES, BRANCHES } from './data/mockData';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<StaffType | null>(null);
@@ -28,6 +30,7 @@ const App: React.FC = () => {
   const [releaseRequests, setReleaseRequests] = useState<StockReleaseRequest[]>([]);
   const [requisitions, setRequisitions] = useState<StockRequisition[]>(MOCK_REQUISITIONS);
   const [disposalRequests, setDisposalRequests] = useState<DisposalRequest[]>([]);
+  const [branches, setBranches] = useState<Branch[]>(BRANCHES);
 
   // Automatic Expiry Check on Load
   useEffect(() => {
@@ -264,6 +267,36 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
+  // Check if current user's branch is ACTIVE (If not Super Admin)
+  const usersBranch = branches.find(b => b.id === currentUser.branchId);
+  if (currentUser.role !== UserRole.SUPER_ADMIN && usersBranch?.status === 'INACTIVE') {
+      return (
+          <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
+              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center border border-slate-200">
+                  <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Lock size={32} />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Restricted</h2>
+                  <div className="flex items-center justify-center gap-2 text-rose-600 bg-rose-50 p-3 rounded-lg mb-4">
+                       <AlertTriangle size={18} />
+                       <span className="font-bold">Branch Inactive</span>
+                  </div>
+                  <p className="text-slate-500 mb-8">
+                      The branch <strong>{usersBranch.name}</strong> has been deactivated by the administration.
+                      <br/><br/>
+                      System access is currently disabled for all users at this location. Please contact Head Office for assistance.
+                  </p>
+                  <button 
+                    onClick={handleLogout} 
+                    className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors"
+                  >
+                      Return to Login
+                  </button>
+              </div>
+          </div>
+      );
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -328,7 +361,7 @@ const App: React.FC = () => {
       case 'staff':
         return <Staff currentBranchId={currentBranchId} />;
       case 'branches':
-        return <Branches />;
+        return <Branches branches={branches} onUpdateBranches={setBranches} />;
       case 'clinical':
         return <Clinical currentBranchId={currentBranchId} />;
       case 'reports':
@@ -356,6 +389,7 @@ const App: React.FC = () => {
       setCurrentBranchId={setCurrentBranchId}
       currentUser={currentUser}
       onLogout={handleLogout}
+      branches={branches}
     >
       {renderContent()}
     </Layout>

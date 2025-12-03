@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -5,7 +6,7 @@ import {
 } from 'recharts';
 import {
   DollarSign, TrendingUp, TrendingDown, Receipt,
-  FileText, Plus, X, Printer, Store, Wallet, Building, CheckCircle, FilePlus, User
+  FileText, Plus, X, Printer, Store, Wallet, Building, CheckCircle, FilePlus, User, Eye
 } from 'lucide-react';
 import { BRANCHES } from '../data/mockData';
 import { Invoice, PaymentMethod, Expense, Sale } from '../types';
@@ -35,6 +36,7 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false); // New Preview Modal
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   // Form States
@@ -165,8 +167,12 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
     alert("Expense recorded successfully! It has been sent to Head Office for approval.");
   };
 
-  const handlePrintInvoice = (inv: Invoice) => {
-      // Logic to trigger print window
+  const handleViewInvoice = (inv: Invoice) => {
+    setSelectedInvoice(inv);
+    setShowPreviewModal(true);
+  };
+
+  const handlePrintInvoice = () => {
       window.print();
   };
 
@@ -339,27 +345,27 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
                                    </span>
                                </td>
                                <td className="px-6 py-4">
-                                   {inv.status !== 'PAID' ? (
-                                     <button 
-                                       onClick={() => { setSelectedInvoice(inv); setShowPaymentModal(true); }}
-                                       className="text-teal-600 hover:text-teal-800 font-bold text-xs bg-teal-50 px-2 py-1 rounded hover:bg-teal-100 flex items-center gap-1 transition-colors"
-                                     >
-                                        <Wallet size={12} /> Pay Now
-                                     </button>
-                                   ) : (
-                                     <div className="flex items-center gap-2">
-                                         <span className="text-slate-400 text-xs flex items-center gap-1">
-                                            <CheckCircle size={12} /> Paid
-                                         </span>
+                                   <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => handleViewInvoice(inv)}
+                                            className="text-slate-500 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded" 
+                                            title="View Invoice"
+                                        >
+                                            <Eye size={16} />
+                                        </button>
+                                       {inv.status !== 'PAID' ? (
                                          <button 
-                                            onClick={() => handlePrintInvoice(inv)}
-                                            className="text-slate-500 hover:text-blue-600" 
-                                            title="Print Invoice"
+                                           onClick={() => { setSelectedInvoice(inv); setShowPaymentModal(true); }}
+                                           className="text-teal-600 hover:text-teal-800 font-bold text-xs bg-teal-50 px-2 py-1 rounded hover:bg-teal-100 flex items-center gap-1 transition-colors"
                                          >
-                                             <Printer size={16} />
+                                            <Wallet size={12} /> Pay Now
                                          </button>
-                                     </div>
-                                   )}
+                                       ) : (
+                                          <span className="text-slate-400 text-xs flex items-center gap-1 px-2">
+                                              <CheckCircle size={12} /> Paid
+                                          </span>
+                                       )}
+                                   </div>
                                </td>
                            </tr>
                          )
@@ -450,9 +456,9 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
         </div>
       )}
 
-      {/* Invoice Modal */}
+      {/* Invoice Modal (New) */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-2xl w-full max-w-md p-6">
                 <h3 className="text-xl font-bold text-slate-900 mb-4">Create New Invoice</h3>
                 <div className="space-y-4">
@@ -511,7 +517,7 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
 
       {/* Payment Modal */}
       {showPaymentModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-2xl w-full max-w-md p-6">
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Record Payment</h3>
                 <p className="text-sm text-slate-500 mb-4">For Invoice #{selectedInvoice.id}</p>
@@ -573,9 +579,130 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
         </div>
       )}
 
+      {/* Preview Invoice Modal (New) */}
+      {showPreviewModal && selectedInvoice && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
+              <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                  <div className="p-4 bg-slate-800 text-white flex justify-between items-center">
+                       <h3 className="font-bold flex items-center gap-2">
+                           <FileText size={18} className="text-blue-400"/> Invoice Preview
+                       </h3>
+                       <button onClick={() => setShowPreviewModal(false)} className="text-slate-400 hover:text-white">
+                           <X size={20} />
+                       </button>
+                   </div>
+                   
+                   <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
+                       <div className="bg-white border border-slate-200 p-8 shadow-sm text-sm">
+                           {/* Invoice Header */}
+                           <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
+                               <div>
+                                   <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wide">
+                                       {selectedInvoice.status === 'PAID' ? 'Tax Invoice' : 'Proforma Invoice'}
+                                   </h1>
+                                   <p className="text-slate-500 mt-1">Invoice #: {selectedInvoice.id}</p>
+                                   <p className="text-slate-500">Date: {selectedInvoice.dateIssued}</p>
+                                   <p className="text-slate-500">Due Date: {selectedInvoice.dueDate}</p>
+                                   <span className={`inline-block px-2 py-0.5 mt-2 rounded text-xs font-bold ${
+                                       selectedInvoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                   }`}>
+                                       {selectedInvoice.status}
+                                   </span>
+                               </div>
+                               <div className="text-right">
+                                   <h2 className="font-bold text-slate-900 text-lg">PMS Pharmacy</h2>
+                                   <p className="text-slate-500">TIN: 123-456-789</p>
+                                   <p className="text-slate-500">VRN: 40-001234</p>
+                                   <p className="text-slate-500 mt-2">Bill To:</p>
+                                   <p className="font-bold text-slate-800 text-lg">{selectedInvoice.customerName}</p>
+                               </div>
+                           </div>
+                           
+                           {/* Items Table */}
+                           <table className="w-full text-left mb-6">
+                               <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                   <tr>
+                                       <th className="py-2 pl-2">Item Description</th>
+                                       <th className="py-2 text-center">Qty</th>
+                                       <th className="py-2 text-right">Unit Price</th>
+                                       <th className="py-2 text-right pr-2">Total</th>
+                                   </tr>
+                               </thead>
+                               <tbody className="divide-y divide-slate-100">
+                                   {selectedInvoice.items && selectedInvoice.items.length > 0 ? selectedInvoice.items.map((item, idx) => (
+                                       <tr key={idx}>
+                                           <td className="py-3 pl-2 font-medium">{item.name}</td>
+                                           <td className="py-3 text-center">{item.quantity}</td>
+                                           <td className="py-3 text-right">{item.price.toLocaleString()}</td>
+                                           <td className="py-3 text-right pr-2">{(item.price * item.quantity).toLocaleString()}</td>
+                                       </tr>
+                                   )) : (
+                                       <tr>
+                                           <td colSpan={4} className="py-4 pl-2 text-slate-500 italic">
+                                               {selectedInvoice.description || 'Consolidated Invoice Items'}
+                                           </td>
+                                       </tr>
+                                   )}
+                               </tbody>
+                           </table>
+                           
+                           {/* Totals */}
+                           <div className="flex justify-end">
+                               <div className="w-64 space-y-2">
+                                   <div className="flex justify-between text-slate-500">
+                                       <span>Subtotal:</span>
+                                       <span>{(selectedInvoice.totalAmount / 1.18).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                                   </div>
+                                   <div className="flex justify-between text-slate-500">
+                                       <span>VAT (18%):</span>
+                                       <span>{(selectedInvoice.totalAmount - (selectedInvoice.totalAmount / 1.18)).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                                   </div>
+                                   <div className="flex justify-between font-bold text-xl text-slate-900 border-t border-slate-200 pt-3">
+                                       <span>Grand Total:</span>
+                                       <span>{selectedInvoice.totalAmount.toLocaleString()} TZS</span>
+                                   </div>
+                                   <div className="flex justify-between text-emerald-600 font-medium pt-1">
+                                       <span>Amount Paid:</span>
+                                       <span>- {selectedInvoice.paidAmount.toLocaleString()}</span>
+                                   </div>
+                                   <div className="flex justify-between text-rose-600 font-bold border-t border-slate-100 pt-2">
+                                       <span>Balance Due:</span>
+                                       <span>{(selectedInvoice.totalAmount - selectedInvoice.paidAmount).toLocaleString()} TZS</span>
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+
+                   <div className="p-4 bg-white border-t border-slate-100 flex justify-end gap-3">
+                       <button 
+                           onClick={() => setShowPreviewModal(false)}
+                           className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-lg border border-slate-200"
+                       >
+                          Close
+                       </button>
+                       <button 
+                           onClick={handlePrintInvoice}
+                           className="px-4 py-2 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-900 flex items-center gap-2"
+                       >
+                          <Printer size={16} /> Print
+                       </button>
+                       {selectedInvoice.status !== 'PAID' && (
+                           <button 
+                               onClick={() => { setShowPreviewModal(false); setShowPaymentModal(true); }}
+                               className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-md flex items-center gap-2"
+                           >
+                              <Wallet size={16} /> Process Payment
+                           </button>
+                       )}
+                   </div>
+              </div>
+          </div>
+      )}
+
       {/* Record Expense Modal */}
       {showExpenseModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">Record Expense</h3>
@@ -647,9 +774,8 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
         </div>
       )}
 
-      {/* Print View Hidden on Screen */}
-      <div className="hidden print-only fixed inset-0 bg-white z-[100] p-8">
-           {/* Basic Receipt Template to demonstrate print functionality */}
+      {/* Print View Hidden on Screen - Visible only during print via CSS class */}
+      <div className="print-only">
            <div className="max-w-xl mx-auto border border-black p-8 text-black">
                 <div className="text-center mb-6">
                     <h1 className="text-2xl font-bold uppercase">PMS Pharmacy</h1>
@@ -659,7 +785,7 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
                 </div>
                 <hr className="border-black my-4"/>
                 <div className="flex justify-between font-bold text-lg mb-2">
-                    <span>TAX INVOICE</span>
+                    <span>{selectedInvoice?.status === 'PAID' ? 'TAX INVOICE' : 'PROFORMA INVOICE'}</span>
                 </div>
                 <p>Invoice #: {selectedInvoice?.id || '---'}</p>
                 <p>Date: {selectedInvoice?.dateIssued || new Date().toISOString().split('T')[0]}</p>
@@ -694,9 +820,11 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
                     <span>TOTAL</span>
                     <span>{selectedInvoice?.totalAmount.toLocaleString()} TZS</span>
                 </div>
+                {selectedInvoice?.status === 'PAID' && (
+                     <div className="mt-2 text-center border border-black p-2 font-bold">PAID IN FULL</div>
+                )}
                 <div className="mt-8 text-center text-sm">
                     <p>Thank you for your business!</p>
-                    <p>Terms & Conditions Apply.</p>
                 </div>
            </div>
       </div>

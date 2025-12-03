@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon, Send, FileText, X, AlertTriangle } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon, Send, FileText, X, AlertTriangle, Eye, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Product, CartItem, PaymentMethod, BranchInventoryItem, Invoice } from '../types';
 import { checkDrugInteractions } from '../services/geminiService';
 import { BRANCHES, PRODUCTS } from '../data/mockData';
@@ -16,6 +16,7 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }
   const [searchTerm, setSearchTerm] = useState('');
   const [quickQty, setQuickQty] = useState<number>(1);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false); // New state for preview
   const [customerName, setCustomerName] = useState('');
   const [interactionWarning, setInteractionWarning] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
@@ -118,8 +119,7 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }
 
   const handleGenerateProforma = () => {
     if (!customerName) {
-        setErrorMsg("Please enter a customer name for the Proforma Invoice.");
-        setTimeout(() => setErrorMsg(null), 3000);
+        setErrorMsg("Please enter a customer name.");
         return;
     }
 
@@ -140,10 +140,15 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }
 
     onCreateInvoice(invoice);
     setCustomerModalOpen(false);
+    setPreviewMode(false);
     setSuccessMsg(`Proforma Invoice #${invoice.id} sent to Finance. Client should proceed to payment.`);
     setCart([]);
     setCustomerName('');
     setTimeout(() => setSuccessMsg(''), 5000);
+  };
+
+  const handlePrintProforma = () => {
+      window.print();
   };
 
   const filteredProducts = availableProducts.filter(p => 
@@ -303,7 +308,7 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }
           
           <button 
             disabled={cart.length === 0}
-            onClick={() => setCustomerModalOpen(true)}
+            onClick={() => { setPreviewMode(false); setCustomerModalOpen(true); }}
             className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex justify-center items-center gap-2"
           >
              <Send size={18} /> Send to Finance
@@ -312,41 +317,198 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }
         </div>
       </div>
 
-      {/* Customer Name Modal */}
+      {/* Customer Name & Preview Modal */}
       {customerModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-              <div className="p-6 border-b border-slate-100 text-center">
-                 <h3 className="text-xl font-bold text-slate-900">Order Details</h3>
-                 <p className="text-slate-500 text-sm">Create Proforma Invoice for Finance</p>
-              </div>
-              <div className="p-6">
-                 <label className="block text-sm font-bold text-slate-700 mb-2">Customer Name</label>
-                 <input 
-                   type="text" 
-                   autoFocus
-                   placeholder="e.g. Walk-in Client, John Doe"
-                   className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                   value={customerName}
-                   onChange={e => setCustomerName(e.target.value)}
-                 />
-              </div>
-              <div className="p-6 bg-slate-50 flex justify-end gap-3">
-                 <button onClick={() => setCustomerModalOpen(false)} className="px-4 py-2 text-slate-500 font-medium">Cancel</button>
-                 <button 
-                    onClick={handleGenerateProforma} 
-                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md"
-                 >
-                    Confirm & Send
-                 </button>
-              </div>
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
+           <div className={`bg-white rounded-2xl w-full ${previewMode ? 'max-w-2xl' : 'max-w-sm'} overflow-hidden animate-in fade-in zoom-in duration-200 transition-all no-print`}>
+              
+              {!previewMode ? (
+                // Step 1: Input Customer Details
+                <>
+                  <div className="p-6 border-b border-slate-100 text-center relative">
+                     <h3 className="text-xl font-bold text-slate-900">Order Details</h3>
+                     <p className="text-slate-500 text-sm">Step 1: Assign to Customer</p>
+                     <button onClick={() => setCustomerModalOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
+                        <X size={20} />
+                     </button>
+                  </div>
+                  <div className="p-6">
+                     <label className="block text-sm font-bold text-slate-700 mb-2">Customer Name</label>
+                     <input 
+                       type="text" 
+                       autoFocus
+                       placeholder="e.g. Walk-in Client, John Doe"
+                       className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                       value={customerName}
+                       onChange={e => setCustomerName(e.target.value)}
+                     />
+                  </div>
+                  <div className="p-6 bg-slate-50 flex justify-end gap-3">
+                     <button onClick={() => setCustomerModalOpen(false)} className="px-4 py-2 text-slate-500 font-medium">Cancel</button>
+                     <button 
+                        onClick={() => {
+                            if (!customerName) {
+                                setErrorMsg("Please enter a name first.");
+                                setTimeout(() => setErrorMsg(null), 2000);
+                                return;
+                            }
+                            setPreviewMode(true);
+                        }} 
+                        className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md flex items-center gap-2"
+                     >
+                        Preview Invoice <ArrowRight size={16} />
+                     </button>
+                  </div>
+                </>
+              ) : (
+                // Step 2: Preview Proforma
+                <>
+                   <div className="p-4 bg-slate-800 text-white flex justify-between items-center no-print">
+                       <h3 className="font-bold flex items-center gap-2">
+                           <FileText size={18} className="text-blue-400"/> Proforma Invoice Preview
+                       </h3>
+                       <button onClick={() => setCustomerModalOpen(false)} className="text-slate-400 hover:text-white">
+                           <X size={20} />
+                       </button>
+                   </div>
+                   
+                   <div className="p-8 bg-slate-50 max-h-[60vh] overflow-y-auto">
+                       <div className="bg-white border border-slate-200 p-6 shadow-sm text-sm">
+                           {/* Invoice Header */}
+                           <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
+                               <div>
+                                   <h1 className="text-lg font-bold text-slate-900 uppercase">Proforma Invoice</h1>
+                                   <p className="text-slate-500">Date: {new Date().toLocaleDateString()}</p>
+                                   <p className="text-slate-500">Branch: {branchName}</p>
+                               </div>
+                               <div className="text-right">
+                                   <h2 className="font-bold text-slate-900">PMS Pharmacy</h2>
+                                   <p className="text-slate-500">TIN: 123-456-789</p>
+                                   <p className="text-slate-500">Bill To: <span className="font-bold text-slate-800">{customerName}</span></p>
+                               </div>
+                           </div>
+                           
+                           {/* Items Table */}
+                           <table className="w-full text-left mb-6">
+                               <thead className="bg-slate-50 text-slate-500">
+                                   <tr>
+                                       <th className="py-2 pl-2">Item</th>
+                                       <th className="py-2 text-center">Qty</th>
+                                       <th className="py-2 text-right">Price</th>
+                                       <th className="py-2 text-right pr-2">Total</th>
+                                   </tr>
+                               </thead>
+                               <tbody className="divide-y divide-slate-100">
+                                   {cart.map((item, idx) => (
+                                       <tr key={idx}>
+                                           <td className="py-2 pl-2 font-medium">{item.name}</td>
+                                           <td className="py-2 text-center">{item.quantity}</td>
+                                           <td className="py-2 text-right">{item.price.toLocaleString()}</td>
+                                           <td className="py-2 text-right pr-2">{(item.price * item.quantity).toLocaleString()}</td>
+                                       </tr>
+                                   ))}
+                               </tbody>
+                           </table>
+                           
+                           {/* Totals */}
+                           <div className="flex justify-end">
+                               <div className="w-48 space-y-2">
+                                   <div className="flex justify-between text-slate-500">
+                                       <span>Subtotal:</span>
+                                       <span>{subtotal.toLocaleString()}</span>
+                                   </div>
+                                   <div className="flex justify-between text-slate-500">
+                                       <span>VAT (18%):</span>
+                                       <span>{vat.toLocaleString()}</span>
+                                   </div>
+                                   <div className="flex justify-between font-bold text-lg text-slate-900 border-t border-slate-200 pt-2">
+                                       <span>Total:</span>
+                                       <span>{total.toLocaleString()} TZS</span>
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+
+                   <div className="p-4 bg-white border-t border-slate-100 flex justify-between gap-3 no-print">
+                       <button 
+                           onClick={() => setPreviewMode(false)}
+                           className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-lg flex items-center gap-2"
+                       >
+                          <ArrowLeft size={16} /> Back to Edit
+                       </button>
+                       <div className="flex gap-2">
+                           <button 
+                               onClick={handlePrintProforma}
+                               className="px-4 py-2 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-900 flex items-center gap-2"
+                           >
+                              <Printer size={16} /> Print
+                           </button>
+                           <button 
+                               onClick={handleGenerateProforma} 
+                               className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-md flex items-center gap-2"
+                           >
+                              <Send size={16} /> Confirm & Send
+                           </button>
+                       </div>
+                   </div>
+                </>
+              )}
+
            </div>
         </div>
       )}
 
+      {/* Print Template - Proforma Invoice */}
+      <div className="print-only">
+           <div className="max-w-xl mx-auto border border-black p-8 text-black">
+                <div className="text-center mb-6">
+                    <h1 className="text-2xl font-bold uppercase">PMS Pharmacy</h1>
+                    <p>TIN: 123-456-789 | VRN: 40-001234</p>
+                    <p>Bagamoyo Road, Dar es Salaam</p>
+                    <p>Branch: {branchName}</p>
+                </div>
+                <hr className="border-black my-4"/>
+                <div className="flex justify-between font-bold text-lg mb-2">
+                    <span>PROFORMA INVOICE</span>
+                </div>
+                <p>Date: {new Date().toLocaleDateString()}</p>
+                <p>Customer: {customerName}</p>
+                <hr className="border-black my-4"/>
+                <table className="w-full text-left mb-6">
+                    <thead>
+                        <tr className="border-b border-black">
+                            <th className="py-2">Item</th>
+                            <th className="py-2 text-right">Qty</th>
+                            <th className="py-2 text-right">Price</th>
+                            <th className="py-2 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {cart.map((item, idx) => (
+                             <tr key={idx}>
+                                 <td className="py-2">{item.name}</td>
+                                 <td className="py-2 text-right">{item.quantity}</td>
+                                 <td className="py-2 text-right">{item.price.toLocaleString()}</td>
+                                 <td className="py-2 text-right">{(item.price * item.quantity).toLocaleString()}</td>
+                             </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <hr className="border-black my-4"/>
+                <div className="flex justify-between font-bold text-xl">
+                    <span>TOTAL</span>
+                    <span>{total.toLocaleString()} TZS</span>
+                </div>
+                <div className="mt-8 text-center text-sm">
+                    <p>This is not a fiscal receipt. Please pay at Finance.</p>
+                </div>
+           </div>
+      </div>
+
       {/* Success Toast */}
       {successMsg && (
-        <div className="fixed bottom-8 right-8 bg-teal-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300 z-50">
+        <div className="fixed bottom-8 right-8 bg-teal-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300 z-50 no-print">
            <CheckCircle className="text-teal-400" />
            <div>
              <h4 className="font-bold">Sent to Finance</h4>
@@ -357,7 +519,7 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }
 
       {/* Error Toast */}
       {errorMsg && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-rose-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300 z-50">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-rose-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300 z-50 no-print">
            <AlertTriangle className="text-white" />
            <div>
              <h4 className="font-bold">Stock Alert</h4>

@@ -16,8 +16,7 @@ import {
   Lock,
   ClipboardCheck
 } from 'lucide-react';
-import { BRANCHES } from '../data/mockData';
-import { Staff, UserRole } from '../types';
+import { Staff, UserRole, Branch } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -27,9 +26,19 @@ interface LayoutProps {
   setCurrentBranchId: (id: string) => void;
   currentUser: Staff | null;
   onLogout: () => void;
+  branches: Branch[];
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentBranchId, setCurrentBranchId, currentUser, onLogout }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  activeTab, 
+  setActiveTab, 
+  currentBranchId, 
+  setCurrentBranchId, 
+  currentUser, 
+  onLogout,
+  branches 
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   // Role-Based Access Control Map
@@ -59,7 +68,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
   ];
 
   const menuItems = allMenuItems.filter(item => userPerms.includes(item.id));
-  const activeBranchName = BRANCHES.find(b => b.id === currentBranchId)?.name || 'Unknown Branch';
+  const activeBranchName = branches.find(b => b.id === currentBranchId)?.name || 'Unknown Branch';
   const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
 
   return (
@@ -85,7 +94,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                  onChange={(e) => setCurrentBranchId(e.target.value)}
                  className="w-full pl-9 pr-3 py-2 bg-teal-800 border border-teal-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500 appearance-none cursor-pointer"
                >
-                 {BRANCHES.map(branch => (
+                 {branches.map(branch => (
                    <option key={branch.id} value={branch.id}>
                      {branch.name}
                    </option>
@@ -102,7 +111,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
            {currentBranchId !== 'HEAD_OFFICE' && (
              <div className="mt-2 flex items-center text-xs text-teal-300 px-1">
                <MapPin size={12} className="mr-1" />
-               {BRANCHES.find(b => b.id === currentBranchId)?.location}
+               {branches.find(b => b.id === currentBranchId)?.location}
              </div>
            )}
         </div>
@@ -172,7 +181,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                  }}
                  className="w-full p-3 bg-teal-800 text-white rounded-lg border border-teal-700"
                >
-                 {BRANCHES.map(branch => (
+                 {branches.map(branch => (
                    <option key={branch.id} value={branch.id}>{branch.name}</option>
                  ))}
                </select>

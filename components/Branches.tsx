@@ -13,11 +13,14 @@ import {
   Save,
   X
 } from 'lucide-react';
-import { BRANCHES } from '../data/mockData';
 import { Branch } from '../types';
 
-const Branches: React.FC = () => {
-  const [branches, setBranches] = useState<Branch[]>(BRANCHES.filter(b => b.id !== 'HEAD_OFFICE'));
+interface BranchesProps {
+    branches: Branch[];
+    onUpdateBranches: (branches: Branch[]) => void;
+}
+
+const Branches: React.FC<BranchesProps> = ({ branches, onUpdateBranches }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   
@@ -26,7 +29,8 @@ const Branches: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Branch>>({});
 
   // Stats
-  const activeBranches = branches.filter(b => b.status === 'ACTIVE').length;
+  const displayBranches = branches.filter(b => b.id !== 'HEAD_OFFICE');
+  const activeBranches = displayBranches.filter(b => b.status === 'ACTIVE').length;
   const totalStaff = 34; // Mock
 
   const handleEditClick = (branch: Branch) => {
@@ -36,20 +40,22 @@ const Branches: React.FC = () => {
   };
 
   const handleToggleStatus = (id: string) => {
-    setBranches(prev => prev.map(b => {
+    const updatedBranches = branches.map(b => {
       if (b.id === id) {
-        return { ...b, status: b.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' };
+        return { ...b, status: b.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' } as Branch;
       }
       return b;
-    }));
+    });
+    onUpdateBranches(updatedBranches);
   };
 
   const handleSaveEdit = () => {
     if (!currentBranch || !formData.name) return;
     
-    setBranches(prev => prev.map(b => 
+    const updatedBranches = branches.map(b => 
       b.id === currentBranch.id ? { ...b, ...formData } as Branch : b
-    ));
+    );
+    onUpdateBranches(updatedBranches);
     setShowEditModal(false);
     setCurrentBranch(null);
   };
@@ -64,7 +70,7 @@ const Branches: React.FC = () => {
          manager: formData.manager || 'Unassigned',
          status: 'ACTIVE'
      };
-     setBranches([...branches, newBranch]);
+     onUpdateBranches([...branches, newBranch]);
      setShowAddModal(false);
      setFormData({});
   };
@@ -91,7 +97,7 @@ const Branches: React.FC = () => {
              <Building size={24} />
            </div>
            <div>
-             <h3 className="text-2xl font-bold text-slate-900">{branches.length}</h3>
+             <h3 className="text-2xl font-bold text-slate-900">{displayBranches.length}</h3>
              <p className="text-sm text-slate-500">Total Locations</p>
            </div>
         </div>
@@ -135,7 +141,7 @@ const Branches: React.FC = () => {
               </tr>
            </thead>
            <tbody className="divide-y divide-slate-100">
-              {branches.map((branch) => (
+              {displayBranches.map((branch) => (
                 <tr key={branch.id} className="hover:bg-slate-50">
                    <td className="px-6 py-4">
                      <div className="font-bold text-slate-800">{branch.name}</div>
