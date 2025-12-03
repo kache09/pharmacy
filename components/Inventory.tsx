@@ -26,10 +26,15 @@ import {
   Tag,
   FilePlus,
   History,
-  User
+  User,
+  Lock,
+  Unlock,
+  CheckCircle,
+  Skull,
+  RotateCcw
 } from 'lucide-react';
-import { BRANCHES, PRODUCTS, STAFF_LIST } from '../data/mockData';
-import { StockTransfer, Product, UserRole, BranchInventoryItem } from '../types';
+import { BRANCHES, PRODUCTS } from '../data/mockData';
+import { StockTransfer, Product, UserRole, BranchInventoryItem, StockReleaseRequest, BatchStatus, StockRequisition, Staff, DisposalRequest } from '../types';
 
 interface ExtendedProduct extends Product {
   customPrice?: number;
@@ -41,10 +46,36 @@ interface InventoryProps {
   setInventory: React.Dispatch<React.SetStateAction<Record<string, BranchInventoryItem[]>>>;
   transfers: StockTransfer[];
   setTransfers: React.Dispatch<React.SetStateAction<StockTransfer[]>>;
+  
+  // Release Props
+  releaseRequests: StockReleaseRequest[];
+  onCreateReleaseRequest: (req: StockReleaseRequest) => void;
+  
+  // Requisition Props
+  onCreateRequisition?: (req: StockRequisition) => void;
+  currentUser?: Staff | null;
+
+  // Disposal Props
+  disposalRequests?: DisposalRequest[];
+  onCreateDisposalRequest?: (req: DisposalRequest) => void;
+  onFinalizeDisposal?: (req: DisposalRequest) => void;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setInventory, transfers, setTransfers }) => {
-  const [activeTab, setActiveTab] = useState<'stock' | 'transfers'>('stock');
+const Inventory: React.FC<InventoryProps> = ({ 
+    currentBranchId, 
+    inventory, 
+    setInventory, 
+    transfers, 
+    setTransfers,
+    releaseRequests,
+    onCreateReleaseRequest,
+    onCreateRequisition,
+    currentUser,
+    disposalRequests = [],
+    onCreateDisposalRequest,
+    onFinalizeDisposal
+}) => {
+  const [activeTab, setActiveTab] = useState<'stock' | 'transfers' | 'control'>('stock');
   
   // Local State for Products (Mocking database of products)
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
@@ -65,6 +96,10 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
   const [verificationCode, setVerificationCode] = useState('');
   const [verifyError, setVerifyError] = useState('');
 
+  // Control Tab State (Release & Disposal)
+  const [selectedHoldItems, setSelectedHoldItems] = useState<string[]>([]);
+  const [selectedExpiredItems, setSelectedExpiredItems] = useState<string[]>([]);
+
   // Form States
   const [newStock, setNewStock] = useState({
     productId: '',
@@ -82,6 +117,12 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
 
   const [priceUpdate, setPriceUpdate] = useState({
       newPrice: ''
+  });
+
+  const [adjustData, setAdjustData] = useState({ 
+      type: 'Correction', 
+      quantity: '0', 
+      reason: '' 
   });
 
   // Shipment / Request Form State
@@ -114,6 +155,7 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
         Object.values(inventory).forEach((branchStockList: any) => {
             const item = branchStockList.find((i: any) => i.productId === product.id);
             if (item) {
+                // For HO View, show total Quantity (Active + On Hold)
                 totalStock += item.quantity;
                 batches = [...batches, ...item.batches];
             }
@@ -131,12 +173,35 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
     return { ...product, totalStock, batches, customPrice };
   });
 
+  // Items that are ON_HOLD for this branch
+  const onHoldItems = displayedInventory.flatMap(p => 
+      p.batches.filter(b => b.status === 'ON_HOLD').map(b => ({
+          ...b,
+          productId: p.id,
+          productName: p.name,
+          batchUniqueId: `${p.id}-${b.batchNumber}`
+      }))
+  );
+
+  // Items that are EXPIRED for this branch
+  const expiredItems = displayedInventory.flatMap(p => 
+      p.batches.filter(b => b.status === 'EXPIRED').map(b => ({
+          ...b,
+          productId: p.id,
+          productName: p.name,
+          batchUniqueId: `${p.id}-${b.batchNumber}`
+      }))
+  );
+
   const totalAssetValue = displayedInventory.reduce((acc, curr) => acc + (curr.totalStock * curr.costPrice), 0);
   const totalPotentialRevenue = displayedInventory.reduce((acc, curr) => acc + (curr.totalStock * (curr.customPrice || curr.price)), 0);
 
   const branchTransfers = transfers.filter(t => 
     isHeadOffice ? true : t.targetBranchId === currentBranchId || t.sourceBranchId === currentBranchId
   );
+
+  const myReleaseRequests = releaseRequests.filter(r => r.branchId === currentBranchId);
+  const myDisposalRequests = disposalRequests.filter(r => r.branchId === currentBranchId);
 
   // --- Handlers ---
 
@@ -158,18 +223,21 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
         const existingItemIndex = branchStock.findIndex(i => i.productId === targetProductId);
         let newBranchStock = [...branchStock];
 
+        const newBatch = {
+            batchNumber: newStock.batchNumber,
+            expiryDate: newStock.expiryDate,
+            quantity: qty,
+            status: 'ACTIVE' as BatchStatus // Direct adds are assumed approved for now
+        };
+
         if (existingItemIndex >= 0) {
             newBranchStock[existingItemIndex].quantity += qty;
-            newBranchStock[existingItemIndex].batches.push({
-                batchNumber: newStock.batchNumber,
-                expiryDate: newStock.expiryDate,
-                quantity: qty
-            });
+            newBranchStock[existingItemIndex].batches.push(newBatch);
         } else {
             newBranchStock.push({
                 productId: targetProductId,
                 quantity: qty,
-                batches: [{ batchNumber: newStock.batchNumber, expiryDate: newStock.expiryDate, quantity: qty }]
+                batches: [newBatch]
             });
         }
         return { ...prev, [targetBranch]: newBranchStock };
@@ -178,24 +246,91 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
     resetForm();
   };
 
-  const handleUpdatePrice = () => {
-      // Logic from previous implementation
-      setShowPriceModal(false);
-  };
-
   const resetForm = () => {
     setNewStock({ productId: '', isNewProduct: false, name: '', genericName: '', category: '', costPrice: '', price: '', unit: 'Box', batchNumber: '', expiryDate: '', quantity: '' });
   };
 
   const openAdjustModal = (item: ExtendedProduct) => {
       setSelectedItem(item);
+      setAdjustData({ type: 'Correction', quantity: '0', reason: '' });
       setShowAdjustModal(true);
+  };
+
+  const handleAdjustStock = () => {
+      if (!selectedItem || !adjustData.quantity) return;
+      const qty = parseInt(adjustData.quantity);
+      if (isNaN(qty) || qty === 0) return;
+
+      setInventory(prev => {
+          const branchStock = [...(prev[currentBranchId] || [])];
+          const itemIndex = branchStock.findIndex(i => i.productId === selectedItem.id);
+          
+          if (itemIndex >= 0) {
+              // Adjust first active batch for simplicity in mock
+              const batchIndex = branchStock[itemIndex].batches.findIndex(b => b.status === 'ACTIVE');
+              if (batchIndex >= 0) {
+                  const newQty = branchStock[itemIndex].batches[batchIndex].quantity + qty;
+                  branchStock[itemIndex].batches[batchIndex].quantity = Math.max(0, newQty);
+              } else if (qty > 0) {
+                 // Create dummy batch if none exists and adding
+                 branchStock[itemIndex].batches.push({
+                     batchNumber: 'ADJ-' + Date.now().toString().slice(-4),
+                     expiryDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+                     quantity: qty,
+                     status: 'ACTIVE'
+                 });
+              }
+              // Update total
+              branchStock[itemIndex].quantity = branchStock[itemIndex].batches.reduce((sum, b) => sum + b.quantity, 0);
+          }
+          return { ...prev, [currentBranchId]: branchStock };
+      });
+      setShowAdjustModal(false);
   };
 
   const openPriceModal = (item: ExtendedProduct) => {
       setSelectedItem(item);
       setPriceUpdate({ newPrice: (item.customPrice || item.price).toString() });
       setShowPriceModal(true);
+  };
+
+  const handleUpdatePrice = () => {
+      if (!selectedItem || !priceUpdate.newPrice) return;
+      const price = parseFloat(priceUpdate.newPrice);
+      
+      setInventory(prev => {
+          const branchStock = [...(prev[currentBranchId] || [])];
+          const itemIndex = branchStock.findIndex(i => i.productId === selectedItem.id);
+          
+          if (itemIndex >= 0) {
+              branchStock[itemIndex].customPrice = price;
+          } else {
+              // If item doesn't exist in branch inventory list yet, add it
+              branchStock.push({
+                  productId: selectedItem.id,
+                  quantity: 0,
+                  batches: [],
+                  customPrice: price
+              });
+          }
+          return { ...prev, [currentBranchId]: branchStock };
+      });
+      setShowPriceModal(false);
+  };
+
+  const handleReorder = (item: ExtendedProduct) => {
+      setNewShipment({
+          targetBranchId: '',
+          notes: 'Reorder for ' + item.name,
+          items: [{
+              productId: item.id,
+              productName: item.name,
+              batchNumber: '', 
+              expiryDate: '',
+              quantity: Math.max(item.minStockLevel * 2, 50)
+          }]
+      });
+      setShowRequestModal(true);
   };
 
   const handleViewLog = (item: ExtendedProduct) => {
@@ -228,8 +363,8 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
           // Just update status to RECEIVED_KEEPER
           setTransfers(prev => prev.map(t => t.id === activeTransferId ? { ...t, status: 'RECEIVED_KEEPER', workflow: { ...t.workflow, logs: [...t.workflow.logs, { role: 'Store Keeper', action: 'Confirmed', timestamp: new Date().toLocaleString(), user: 'Current User' }] } } as StockTransfer : t));
       } else {
-           // CONTROLLER VERIFICATION - THIS COMMITS TO INVENTORY
-           setTransfers(prev => prev.map(t => t.id === activeTransferId ? { ...t, status: 'COMPLETED', workflow: { ...t.workflow, logs: [...t.workflow.logs, { role: 'Controller', action: 'Verified & Stocked', timestamp: new Date().toLocaleString(), user: 'Current User' }] } } as StockTransfer : t));
+           // CONTROLLER VERIFICATION - THIS COMMITS TO INVENTORY BUT AS 'ON_HOLD'
+           setTransfers(prev => prev.map(t => t.id === activeTransferId ? { ...t, status: 'COMPLETED', workflow: { ...t.workflow, logs: [...t.workflow.logs, { role: 'Controller', action: 'Verified & Stocked (Hold)', timestamp: new Date().toLocaleString(), user: 'Current User' }] } } as StockTransfer : t));
            
            // Update Inventory State
            setInventory(prev => {
@@ -239,24 +374,24 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                transfer.items.forEach(item => {
                    const existingItemIndex = currentBranchStock.findIndex(i => i.productId === item.productId);
                    
+                   // New Protocol: Status is ON_HOLD
+                   const newBatch = {
+                       batchNumber: item.batchNumber,
+                       expiryDate: item.expiryDate,
+                       quantity: item.quantity,
+                       status: 'ON_HOLD' as BatchStatus
+                   };
+
                    if (existingItemIndex >= 0) {
                        // Update existing product
                        currentBranchStock[existingItemIndex].quantity += item.quantity;
-                       currentBranchStock[existingItemIndex].batches.push({
-                           batchNumber: item.batchNumber,
-                           expiryDate: item.expiryDate,
-                           quantity: item.quantity
-                       });
+                       currentBranchStock[existingItemIndex].batches.push(newBatch);
                    } else {
                        // Add new product entry for branch
                        currentBranchStock.push({
                            productId: item.productId,
                            quantity: item.quantity,
-                           batches: [{
-                               batchNumber: item.batchNumber,
-                               expiryDate: item.expiryDate,
-                               quantity: item.quantity
-                           }]
+                           batches: [newBatch]
                        });
                    }
                });
@@ -264,7 +399,7 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                return { ...prev, [branchId]: currentBranchStock };
            });
            
-           alert("Stock has been successfully verified and added to the active inventory.");
+           alert("Stock verified and added to inventory ON HOLD. Please request release to make it saleable.");
       }
       setShowVerifyModal(false);
   };
@@ -316,9 +451,77 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
   };
 
   const handleCreateRequisition = () => {
+      if (!onCreateRequisition) return;
+      
+      const requisition: StockRequisition = {
+          id: `REQ-${Date.now().toString().slice(-4)}`,
+          branchId: currentBranchId,
+          requestDate: new Date().toISOString().split('T')[0],
+          requestedBy: currentUser?.name || 'Unknown',
+          status: 'PENDING',
+          priority: newShipment.notes.toLowerCase().includes('urgent') ? 'URGENT' : 'NORMAL',
+          items: newShipment.items.map(i => ({
+              productId: i.productId,
+              productName: i.productName,
+              currentStock: 0, // In real app, look up current stock
+              requestedQty: i.quantity
+          }))
+      };
+
+      onCreateRequisition(requisition);
       alert("Stock Requisition sent to Head Office for Approval.");
       setShowRequestModal(false);
       setNewShipment({ targetBranchId: '', notes: '', items: [] });
+  };
+
+  // --- RELEASE & DISPOSAL HANDLERS ---
+  const handleRequestRelease = () => {
+      if (selectedHoldItems.length === 0) return;
+
+      const itemsToRelease = onHoldItems.filter(i => selectedHoldItems.includes(i.batchUniqueId)).map(i => ({
+          productId: i.productId,
+          productName: i.productName,
+          batchNumber: i.batchNumber,
+          quantity: i.quantity
+      }));
+
+      const request: StockReleaseRequest = {
+          id: `REL-${Date.now().toString().slice(-6)}`,
+          branchId: currentBranchId,
+          requestedBy: currentUser?.name || 'Inventory Keeper',
+          date: new Date().toISOString().split('T')[0],
+          status: 'PENDING',
+          items: itemsToRelease
+      };
+
+      onCreateReleaseRequest(request);
+      alert("Release Request sent to Head Office.");
+      setSelectedHoldItems([]);
+  };
+
+  const handleRequestDisposal = () => {
+      if (selectedExpiredItems.length === 0 || !onCreateDisposalRequest) return;
+
+      const itemsToDispose = expiredItems.filter(i => selectedExpiredItems.includes(i.batchUniqueId)).map(i => ({
+          productId: i.productId,
+          productName: i.productName,
+          batchNumber: i.batchNumber,
+          quantity: i.quantity,
+          reason: 'Expired'
+      }));
+
+      const request: DisposalRequest = {
+          id: `DISP-${Date.now().toString().slice(-6)}`,
+          branchId: currentBranchId,
+          requestedBy: currentUser?.name || 'Inventory Keeper',
+          date: new Date().toISOString().split('T')[0],
+          status: 'PENDING',
+          items: itemsToDispose
+      };
+
+      onCreateDisposalRequest(request);
+      alert("Disposal Request sent to Head Office.");
+      setSelectedExpiredItems([]);
   };
 
   return (
@@ -372,6 +575,24 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                     </span>
                 )}
             </button>
+            {!isHeadOffice && (
+                <button 
+                    onClick={() => setActiveTab('control')}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2 ${activeTab === 'control' ? 'bg-white border-teal-600 text-teal-700 border shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                    Stock Control
+                    {onHoldItems.length > 0 && (
+                        <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                            {onHoldItems.length}
+                        </span>
+                    )}
+                    {expiredItems.length > 0 && (
+                        <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
+                            {expiredItems.length}
+                        </span>
+                    )}
+                </button>
+            )}
         </div>
       </div>
 
@@ -438,7 +659,9 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {displayedInventory.map((product) => {
-                    const isLowStock = product.totalStock <= product.minStockLevel;
+                    // Only count ACTIVE stock for visual alerts, but allow totalStock to show all for accounting
+                    const activeStock = product.batches.filter(b => b.status === 'ACTIVE').reduce((sum, b) => sum + b.quantity, 0);
+                    const isLowStock = activeStock <= product.minStockLevel;
                     const stockValue = product.totalStock * product.costPrice;
                     const sellingPrice = product.customPrice || product.price;
                     const hasCustomPrice = !!product.customPrice;
@@ -469,12 +692,12 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
                                     <span className={`font-bold text-lg ${isLowStock ? 'text-red-600' : 'text-slate-800'}`}>
-                                        {product.totalStock}
+                                        {activeStock}
                                     </span>
-                                    <span className="text-xs text-slate-400">{product.unit}s</span>
+                                    <span className="text-xs text-slate-400">{product.unit}s (Active)</span>
                                     {isLowStock && <AlertTriangle size={14} className="text-red-500" />}
                                 </div>
-                                <span className="text-[10px] text-slate-400">Val: {stockValue.toLocaleString()} TZS</span>
+                                <span className="text-[10px] text-slate-400">Total: {product.totalStock} (Val: {stockValue.toLocaleString()})</span>
                             </div>
                         </td>
                         <td className="px-6 py-4">
@@ -482,6 +705,11 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                             {product.batches.length > 0 ? product.batches.map((batch, idx) => {
                                 const expiry = new Date(batch.expiryDate);
                                 const isExpiring = expiry.getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000; // 30 days
+                                
+                                let statusBadge = <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold">OK</span>;
+                                if (batch.status === 'ON_HOLD') statusBadge = <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded font-bold">HOLD</span>;
+                                if (batch.status === 'EXPIRED') statusBadge = <span className="text-[10px] bg-rose-100 text-rose-700 px-1 rounded font-bold">EXPIRED</span>;
+
                                 return (
                                     <div key={idx} className="flex items-center gap-2 text-xs">
                                     <span className="font-mono text-slate-500">{batch.batchNumber}</span>
@@ -489,6 +717,7 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                                         <Calendar size={10} />
                                         {batch.expiryDate}
                                     </span>
+                                    {statusBadge}
                                     <span className="text-slate-400">({batch.quantity})</span>
                                     </div>
                                 )
@@ -505,17 +734,26 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                                 </button>
                             ) : (
                                 <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => openAdjustModal(product)}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 text-xs transition-colors shadow-sm text-center flex-1"
+                                        >
+                                            Adjust Stock
+                                        </button>
+                                        <button 
+                                            onClick={() => openPriceModal(product)}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-xs transition-colors shadow-sm text-center flex items-center justify-center gap-1"
+                                            title="Set Price"
+                                        >
+                                            <Tag size={12} />
+                                        </button>
+                                    </div>
                                     <button 
-                                        onClick={() => openAdjustModal(product)}
-                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 text-xs transition-colors shadow-sm text-center"
+                                        onClick={() => handleReorder(product)}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-xs transition-colors shadow-sm text-center flex items-center justify-center gap-1"
                                     >
-                                        Adjust Stock
-                                    </button>
-                                    <button 
-                                        onClick={() => openPriceModal(product)}
-                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-xs transition-colors shadow-sm text-center flex items-center justify-center gap-1"
-                                    >
-                                        <Tag size={12} /> Set Price
+                                        <RotateCcw size={12} /> Reorder
                                     </button>
                                 </div>
                             )}
@@ -527,6 +765,191 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                 </table>
             </div>
         </div>
+      )}
+
+      {/* Control Tab for Release & Disposal Protocol */}
+      {activeTab === 'control' && !isHeadOffice && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* ON HOLD Items (Release) */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 bg-amber-50">
+                          <h3 className="font-bold text-amber-800 flex items-center gap-2">
+                              <Lock size={18} /> Quarantined Stock (On Hold)
+                          </h3>
+                          <p className="text-xs text-amber-600 mt-1">
+                              These items are physically in stock but hidden from POS until released.
+                          </p>
+                      </div>
+                      
+                      {onHoldItems.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400">
+                              <CheckCircle size={32} className="mx-auto mb-2 opacity-50 text-emerald-500" />
+                              <p>All stock is active and released.</p>
+                          </div>
+                      ) : (
+                          <div className="p-4">
+                              <table className="w-full text-left text-sm">
+                                  <thead>
+                                      <tr className="text-slate-500 border-b border-slate-100">
+                                          <th className="pb-2 w-8"><input type="checkbox" disabled /></th>
+                                          <th className="pb-2">Product</th>
+                                          <th className="pb-2">Batch</th>
+                                          <th className="pb-2">Qty</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                      {onHoldItems.map((item) => (
+                                          <tr key={item.batchUniqueId} className="hover:bg-slate-50">
+                                              <td className="py-2">
+                                                  <input 
+                                                    type="checkbox" 
+                                                    checked={selectedHoldItems.includes(item.batchUniqueId)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedHoldItems([...selectedHoldItems, item.batchUniqueId]);
+                                                        else setSelectedHoldItems(selectedHoldItems.filter(id => id !== item.batchUniqueId));
+                                                    }}
+                                                  />
+                                              </td>
+                                              <td className="py-2 font-medium">{item.productName}</td>
+                                              <td className="py-2 font-mono text-slate-500">{item.batchNumber}</td>
+                                              <td className="py-2 font-bold">{item.quantity}</td>
+                                          </tr>
+                                      ))}
+                                  </tbody>
+                              </table>
+                              <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end">
+                                  <button 
+                                    onClick={handleRequestRelease}
+                                    disabled={selectedHoldItems.length === 0}
+                                    className="px-4 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
+                                  >
+                                      <Unlock size={16} /> Request Release
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* EXPIRED Items (Disposal) */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 bg-rose-50">
+                          <h3 className="font-bold text-rose-800 flex items-center gap-2">
+                              <Skull size={18} /> Expired Stock (Disposal)
+                          </h3>
+                          <p className="text-xs text-rose-600 mt-1">
+                              Items past expiry date. Request authorization to destroy.
+                          </p>
+                      </div>
+                      
+                      {expiredItems.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400">
+                              <CheckCircle size={32} className="mx-auto mb-2 opacity-50 text-emerald-500" />
+                              <p>No expired stock detected.</p>
+                          </div>
+                      ) : (
+                          <div className="p-4">
+                              <table className="w-full text-left text-sm">
+                                  <thead>
+                                      <tr className="text-slate-500 border-b border-slate-100">
+                                          <th className="pb-2 w-8"><input type="checkbox" disabled /></th>
+                                          <th className="pb-2">Product</th>
+                                          <th className="pb-2">Batch (Exp)</th>
+                                          <th className="pb-2">Qty</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                      {expiredItems.map((item) => (
+                                          <tr key={item.batchUniqueId} className="hover:bg-slate-50">
+                                              <td className="py-2">
+                                                  <input 
+                                                    type="checkbox" 
+                                                    checked={selectedExpiredItems.includes(item.batchUniqueId)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedExpiredItems([...selectedExpiredItems, item.batchUniqueId]);
+                                                        else setSelectedExpiredItems(selectedExpiredItems.filter(id => id !== item.batchUniqueId));
+                                                    }}
+                                                  />
+                                              </td>
+                                              <td className="py-2 font-medium text-rose-900">{item.productName}</td>
+                                              <td className="py-2 font-mono text-rose-600">
+                                                  {item.batchNumber} <br/><span className="text-[10px]">{item.expiryDate}</span>
+                                              </td>
+                                              <td className="py-2 font-bold">{item.quantity}</td>
+                                          </tr>
+                                      ))}
+                                  </tbody>
+                              </table>
+                              <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end">
+                                  <button 
+                                    onClick={handleRequestDisposal}
+                                    disabled={selectedExpiredItems.length === 0}
+                                    className="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
+                                  >
+                                      <Trash2 size={16} /> Request Disposal
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              </div>
+
+              {/* Status Section for Requests */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50">
+                       <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                           <History size={18} /> Request History (Release & Disposal)
+                       </h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
+                        {/* Release History */}
+                        <div className="p-4">
+                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Release Requests</h4>
+                             {myReleaseRequests.length === 0 ? <p className="text-xs text-slate-400 italic">No history.</p> : (
+                                 <div className="space-y-2">
+                                     {myReleaseRequests.map(req => (
+                                         <div key={req.id} className="p-2 border border-slate-100 rounded bg-slate-50 text-xs">
+                                             <div className="flex justify-between">
+                                                 <span className="font-bold">{req.id}</span>
+                                                 <span className={`px-1 rounded ${req.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{req.status}</span>
+                                             </div>
+                                             <div className="text-slate-500 mt-1">{req.items.length} items • {req.date}</div>
+                                         </div>
+                                     ))}
+                                 </div>
+                             )}
+                        </div>
+
+                        {/* Disposal History */}
+                        <div className="p-4">
+                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Disposal Requests</h4>
+                             {myDisposalRequests.length === 0 ? <p className="text-xs text-slate-400 italic">No history.</p> : (
+                                 <div className="space-y-2">
+                                     {myDisposalRequests.map(req => (
+                                         <div key={req.id} className="p-2 border border-slate-100 rounded bg-slate-50 text-xs">
+                                             <div className="flex justify-between">
+                                                 <span className="font-bold">{req.id}</span>
+                                                 <span className={`px-1 rounded ${req.status === 'COMPLETED' ? 'bg-slate-200 text-slate-700' : req.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{req.status}</span>
+                                             </div>
+                                             <div className="text-slate-500 mt-1">{req.items.length} items • {req.date}</div>
+                                             
+                                             {/* If Approved, show Finalize button */}
+                                             {req.status === 'APPROVED' && onFinalizeDisposal && (
+                                                 <button 
+                                                    onClick={() => onFinalizeDisposal(req)}
+                                                    className="mt-2 w-full py-1 bg-rose-600 text-white font-bold rounded hover:bg-rose-700"
+                                                 >
+                                                     Confirm Destruction
+                                                 </button>
+                                             )}
+                                         </div>
+                                     ))}
+                                 </div>
+                             )}
+                        </div>
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* Transfers Tab Content */}
@@ -751,6 +1174,100 @@ const Inventory: React.FC<InventoryProps> = ({ currentBranchId, inventory, setIn
                   <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
                       <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
                       <button onClick={handleSaveStock} className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700">Save to Inventory</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Adjust Stock Modal */}
+      {showAdjustModal && selectedItem && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                      <h3 className="text-xl font-bold text-slate-900">Adjust Stock</h3>
+                      <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                  </div>
+                  
+                  <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                      <p className="font-bold text-slate-800">{selectedItem.name}</p>
+                      <p className="text-sm text-slate-500">Current Active Stock: {selectedItem.totalStock}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Adjustment Type</label>
+                          <select 
+                            className="w-full p-2 border border-slate-300 rounded-lg"
+                            value={adjustData.type}
+                            onChange={(e) => setAdjustData({...adjustData, type: e.target.value})}
+                          >
+                              <option value="Correction">Correction (+/-)</option>
+                              <option value="Damaged">Damaged (Remove)</option>
+                              <option value="Theft">Theft/Lost (Remove)</option>
+                              <option value="Return">Customer Return (Add)</option>
+                          </select>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Quantity Change</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-3 border border-slate-300 rounded-lg font-bold"
+                            placeholder="+/- Qty"
+                            value={adjustData.quantity}
+                            onChange={(e) => setAdjustData({...adjustData, quantity: e.target.value})}
+                          />
+                          <p className="text-xs text-slate-400 mt-1">Use negative values to remove stock (e.g. -5)</p>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Reason / Note</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-2 border border-slate-300 rounded-lg"
+                            placeholder="Brief explanation..."
+                            value={adjustData.reason}
+                            onChange={(e) => setAdjustData({...adjustData, reason: e.target.value})}
+                          />
+                      </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3">
+                      <button onClick={() => setShowAdjustModal(false)} className="px-4 py-2 text-slate-600">Cancel</button>
+                      <button onClick={handleAdjustStock} className="px-4 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700">Confirm Adjustment</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Set Price Modal */}
+      {showPriceModal && selectedItem && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                      <h3 className="text-xl font-bold text-slate-900">Set Custom Price</h3>
+                      <button onClick={() => setShowPriceModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                  </div>
+                  
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <p className="font-bold text-blue-900">{selectedItem.name}</p>
+                      <p className="text-xs text-blue-700">Base Global Price: {selectedItem.price.toLocaleString()} TZS</p>
+                  </div>
+
+                  <div className="space-y-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Branch Selling Price (TZS)</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-3 border border-slate-300 rounded-lg font-bold text-lg"
+                            placeholder="0.00"
+                            value={priceUpdate.newPrice}
+                            onChange={(e) => setPriceUpdate({ newPrice: e.target.value })}
+                          />
+                      </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3">
+                      <button onClick={() => setShowPriceModal(false)} className="px-4 py-2 text-slate-600">Cancel</button>
+                      <button onClick={handleUpdatePrice} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Update Price</button>
                   </div>
               </div>
           </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   ClipboardCheck, 
@@ -7,35 +6,42 @@ import {
   DollarSign, 
   Package, 
   Calendar, 
-  MapPin,
   AlertOctagon,
   ArrowRight,
-  Filter
+  Filter,
+  Unlock,
+  Trash2
 } from 'lucide-react';
-import { INITIAL_EXPENSES, MOCK_REQUISITIONS, BRANCHES } from '../data/mockData';
-import { Expense, StockRequisition } from '../types';
+import { BRANCHES } from '../data/mockData';
+import { Expense, StockRequisition, StockReleaseRequest, DisposalRequest } from '../types';
 
-const Approvals: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'expenses' | 'stock'>('expenses');
+interface ApprovalsProps {
+    releaseRequests?: StockReleaseRequest[];
+    onApproveRelease?: (req: StockReleaseRequest) => void;
+    requisitions?: StockRequisition[];
+    onActionRequisition?: (id: string, action: 'APPROVED' | 'REJECTED') => void;
+    disposalRequests?: DisposalRequest[];
+    onApproveDisposal?: (req: DisposalRequest) => void;
+    expenses?: Expense[];
+    onActionExpense?: (id: number, action: 'Approved' | 'Rejected') => void;
+}
+
+const Approvals: React.FC<ApprovalsProps> = ({ 
+    releaseRequests = [], 
+    onApproveRelease,
+    requisitions = [],
+    onActionRequisition,
+    disposalRequests = [],
+    onApproveDisposal,
+    expenses = [],
+    onActionExpense
+}) => {
+  const [activeTab, setActiveTab] = useState<'expenses' | 'stock' | 'release' | 'disposal'>('expenses');
   
-  // Local state to simulate approvals/rejections
-  const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
-  const [requisitions, setRequisitions] = useState<StockRequisition[]>(MOCK_REQUISITIONS);
-
   const pendingExpenses = expenses.filter(e => e.status === 'Pending');
   const pendingRequisitions = requisitions.filter(r => r.status === 'PENDING');
-
-  const handleExpenseAction = (id: number, action: 'Approved' | 'Rejected') => {
-    setExpenses(prev => prev.map(e => e.id === id ? { ...e, status: action } : e));
-  };
-
-  const handleRequisitionAction = (id: string, action: 'APPROVED' | 'REJECTED') => {
-    setRequisitions(prev => prev.map(r => r.id === id ? { ...r, status: action } : r));
-    if (action === 'APPROVED') {
-        alert("Requisition Approved! The system will now open the Shipment Creation wizard pre-filled with these items.");
-        // In a real app, this would redirect to Inventory > New Shipment with data
-    }
-  };
+  const pendingRelease = releaseRequests.filter(r => r.status === 'PENDING');
+  const pendingDisposal = disposalRequests.filter(r => r.status === 'PENDING');
 
   return (
     <div className="space-y-6">
@@ -49,15 +55,29 @@ const Approvals: React.FC = () => {
                 onClick={() => setActiveTab('expenses')}
                 className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'expenses' ? 'bg-teal-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             >
-                <DollarSign size={16} /> Expense Requests
+                <DollarSign size={16} /> Expense
                 {pendingExpenses.length > 0 && <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingExpenses.length}</span>}
             </button>
             <button 
                 onClick={() => setActiveTab('stock')}
                 className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'stock' ? 'bg-teal-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             >
-                <Package size={16} /> Stock Requisitions
+                <Package size={16} /> Requisitions
                 {pendingRequisitions.length > 0 && <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingRequisitions.length}</span>}
+            </button>
+            <button 
+                onClick={() => setActiveTab('release')}
+                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'release' ? 'bg-teal-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
+                <Unlock size={16} /> Release
+                {pendingRelease.length > 0 && <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingRelease.length}</span>}
+            </button>
+            <button 
+                onClick={() => setActiveTab('disposal')}
+                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'disposal' ? 'bg-teal-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
+                <Trash2 size={16} /> Disposals
+                {pendingDisposal.length > 0 && <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingDisposal.length}</span>}
             </button>
         </div>
       </div>
@@ -112,13 +132,13 @@ const Approvals: React.FC = () => {
                                       </td>
                                       <td className="px-6 py-4 flex justify-center gap-2">
                                           <button 
-                                            onClick={() => handleExpenseAction(expense.id, 'Approved')}
+                                            onClick={() => onActionExpense && onActionExpense(expense.id, 'Approved')}
                                             className="p-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors" title="Approve"
                                           >
                                               <CheckCircle size={18} />
                                           </button>
                                           <button 
-                                            onClick={() => handleExpenseAction(expense.id, 'Rejected')}
+                                            onClick={() => onActionExpense && onActionExpense(expense.id, 'Rejected')}
                                             className="p-2 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors" title="Reject"
                                           >
                                               <XCircle size={18} />
@@ -167,13 +187,13 @@ const Approvals: React.FC = () => {
                                       </div>
                                       <div className="flex gap-2">
                                           <button 
-                                            onClick={() => handleRequisitionAction(req.id, 'REJECTED')}
+                                            onClick={() => onActionRequisition && onActionRequisition(req.id, 'REJECTED')}
                                             className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 font-medium text-sm"
                                           >
                                               Reject
                                           </button>
                                           <button 
-                                            onClick={() => handleRequisitionAction(req.id, 'APPROVED')}
+                                            onClick={() => onActionRequisition && onActionRequisition(req.id, 'APPROVED')}
                                             className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-bold text-sm shadow-md flex items-center gap-2"
                                           >
                                               Approve & Ship <ArrowRight size={16} />
@@ -202,6 +222,128 @@ const Approvals: React.FC = () => {
                       </div>
                   )}
               </div>
+          )}
+
+          {activeTab === 'release' && (
+               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                          <Unlock size={18} className="text-amber-600" /> Pending Stock Release Requests
+                      </h3>
+                      <p className="text-xs text-slate-500">Authorize Quarantined Stock for Sale</p>
+                  </div>
+                  {pendingRelease.length === 0 ? (
+                      <div className="p-12 text-center text-slate-400">
+                          <CheckCircle size={48} className="mx-auto mb-4 opacity-20 text-teal-600" />
+                          <p>No release requests. All active stock is authorized.</p>
+                      </div>
+                  ) : (
+                      <div className="divide-y divide-slate-100">
+                           {pendingRelease.map(req => (
+                               <div key={req.id} className="p-6 hover:bg-slate-50 transition-colors">
+                                   <div className="flex justify-between items-start mb-4">
+                                       <div>
+                                            <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                                {BRANCHES.find(b => b.id === req.branchId)?.name}
+                                            </h4>
+                                            <p className="text-sm text-slate-500 mt-1">Requested by {req.requestedBy} on {req.date}</p>
+                                       </div>
+                                       {onApproveRelease && (
+                                           <button 
+                                              onClick={() => onApproveRelease(req)}
+                                              className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-md flex items-center gap-2"
+                                           >
+                                               <CheckCircle size={16} /> Approve Release
+                                           </button>
+                                       )}
+                                   </div>
+                                   <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
+                                       <table className="w-full text-left text-sm">
+                                           <thead>
+                                               <tr className="text-amber-900 border-b border-amber-200">
+                                                   <th className="pb-2">Product Name</th>
+                                                   <th className="pb-2">Batch Number</th>
+                                                   <th className="pb-2 text-right">Qty to Release</th>
+                                               </tr>
+                                           </thead>
+                                           <tbody>
+                                               {req.items.map((item, i) => (
+                                                   <tr key={i}>
+                                                       <td className="py-2 text-amber-900 font-medium">{item.productName}</td>
+                                                       <td className="py-2 text-amber-800 font-mono">{item.batchNumber}</td>
+                                                       <td className="py-2 text-right font-bold text-amber-900">{item.quantity}</td>
+                                                   </tr>
+                                               ))}
+                                           </tbody>
+                                       </table>
+                                   </div>
+                               </div>
+                           ))}
+                      </div>
+                  )}
+               </div>
+          )}
+
+          {activeTab === 'disposal' && (
+               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-rose-50">
+                      <h3 className="font-bold text-rose-800 flex items-center gap-2">
+                          <Trash2 size={18} /> Pending Stock Disposal Requests
+                      </h3>
+                      <p className="text-xs text-rose-600">Authorize Permanent Removal of Stock</p>
+                  </div>
+                  {pendingDisposal.length === 0 ? (
+                      <div className="p-12 text-center text-slate-400">
+                          <CheckCircle size={48} className="mx-auto mb-4 opacity-20 text-rose-600" />
+                          <p>No disposal requests pending.</p>
+                      </div>
+                  ) : (
+                      <div className="divide-y divide-slate-100">
+                           {pendingDisposal.map(req => (
+                               <div key={req.id} className="p-6 hover:bg-slate-50 transition-colors">
+                                   <div className="flex justify-between items-start mb-4">
+                                       <div>
+                                            <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                                {BRANCHES.find(b => b.id === req.branchId)?.name}
+                                            </h4>
+                                            <p className="text-sm text-slate-500 mt-1">Requested by {req.requestedBy} on {req.date}</p>
+                                       </div>
+                                       {onApproveDisposal && (
+                                           <button 
+                                              onClick={() => onApproveDisposal(req)}
+                                              className="px-6 py-2 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 shadow-md flex items-center gap-2"
+                                           >
+                                               <CheckCircle size={16} /> Authorize Destruction
+                                           </button>
+                                       )}
+                                   </div>
+                                   <div className="bg-rose-50 rounded-xl border border-rose-100 p-4">
+                                       <table className="w-full text-left text-sm">
+                                           <thead>
+                                               <tr className="text-rose-900 border-b border-rose-200">
+                                                   <th className="pb-2">Product Name</th>
+                                                   <th className="pb-2">Batch Number</th>
+                                                   <th className="pb-2">Reason</th>
+                                                   <th className="pb-2 text-right">Qty</th>
+                                               </tr>
+                                           </thead>
+                                           <tbody>
+                                               {req.items.map((item, i) => (
+                                                   <tr key={i}>
+                                                       <td className="py-2 text-rose-900 font-medium">{item.productName}</td>
+                                                       <td className="py-2 text-rose-800 font-mono">{item.batchNumber}</td>
+                                                       <td className="py-2 text-rose-700">{item.reason}</td>
+                                                       <td className="py-2 text-right font-bold text-rose-900">{item.quantity}</td>
+                                                   </tr>
+                                               ))}
+                                           </tbody>
+                                       </table>
+                                   </div>
+                               </div>
+                           ))}
+                      </div>
+                  )}
+               </div>
           )}
       </div>
     </div>

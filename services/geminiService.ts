@@ -3,12 +3,16 @@ import { Product } from "../types";
 
 // Helper to safely get the AI instance
 const getAI = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    console.warn("Gemini API Key is missing. AI features will return mock data.");
-    return null;
+  try {
+    // Check if process is defined to avoid ReferenceError in some browser envs
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+  } catch (e) {
+    console.warn("Environment variable access failed", e);
   }
-  return new GoogleGenAI({ apiKey });
+  console.warn("Gemini API Key is missing. AI features will return mock data.");
+  return null;
 };
 
 export const checkDrugInteractions = async (drugs: Product[]): Promise<string> => {

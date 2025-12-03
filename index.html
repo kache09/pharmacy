@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -14,12 +15,35 @@
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
+      /* Default: Hide print-only elements on screen */
+      .print-only { display: none; }
+
       @media print {
-        aside, header, .no-print { display: none !important; }
-        main { padding: 0 !important; overflow: visible !important; height: auto !important; }
-        body { background: white; }
-        #root { height: auto; overflow: visible; }
-        .print-only { display: block; }
+        /* Hide UI elements */
+        aside, header, .no-print, .no-print * { display: none !important; }
+        
+        /* Reset layout for print */
+        body, main, #root { 
+          background: white; 
+          height: auto !important; 
+          overflow: visible !important; 
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        
+        /* Show print-only elements with absolute positioning to avoid conflicts */
+        .print-only { 
+          display: block !important; 
+          position: absolute; 
+          top: 0;
+          left: 0;
+          width: 100%;
+          margin: 0;
+          padding: 20px;
+          background: white;
+          z-index: 9999;
+        }
+
         /* Ensure charts print somewhat decently */
         .recharts-responsive-container { min-height: 300px; }
       }

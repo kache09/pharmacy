@@ -51,16 +51,16 @@ export const PRODUCTS: Product[] = [
 // Mapping stock per branch for logic simulation
 export const BRANCH_INVENTORY: Record<string, BranchInventoryItem[]> = {
   'BR001': [ // Kariakoo
-    { productId: '1', quantity: 120, batches: [{ batchNumber: 'PANA-001', expiryDate: '2025-06-01', quantity: 120 }] },
-    { productId: '2', quantity: 15, batches: [{ batchNumber: 'AUG-992', expiryDate: '2023-12-01', quantity: 15 }] },
-    { productId: '3', quantity: 200, batches: [{ batchNumber: 'MET-101', expiryDate: '2026-01-01', quantity: 200 }] },
+    { productId: '1', quantity: 120, batches: [{ batchNumber: 'PANA-001', expiryDate: '2025-06-01', quantity: 120, status: 'ACTIVE' }] },
+    { productId: '2', quantity: 15, batches: [{ batchNumber: 'AUG-992', expiryDate: '2023-12-01', quantity: 15, status: 'ACTIVE' }] },
+    { productId: '3', quantity: 200, batches: [{ batchNumber: 'MET-101', expiryDate: '2026-01-01', quantity: 200, status: 'ACTIVE' }] },
   ],
   'BR002': [ // Masaki - Higher prices for some items
-    { productId: '1', quantity: 450, batches: [{ batchNumber: 'PANA-003', expiryDate: '2025-08-01', quantity: 450 }], customPrice: 6000 },
-    { productId: '2', quantity: 80, batches: [{ batchNumber: 'AUG-994', expiryDate: '2024-05-01', quantity: 80 }], customPrice: 18000 },
+    { productId: '1', quantity: 450, batches: [{ batchNumber: 'PANA-003', expiryDate: '2025-08-01', quantity: 450, status: 'ACTIVE' }], customPrice: 6000 },
+    { productId: '2', quantity: 80, batches: [{ batchNumber: 'AUG-994', expiryDate: '2024-05-01', quantity: 80, status: 'ACTIVE' }], customPrice: 18000 },
   ],
   'BR004': [ // Dodoma
-    { productId: '1', quantity: 60, batches: [{ batchNumber: 'PANA-005', expiryDate: '2025-02-01', quantity: 60 }] },
+    { productId: '1', quantity: 60, batches: [{ batchNumber: 'PANA-005', expiryDate: '2025-02-01', quantity: 60, status: 'ACTIVE' }] },
   ]
 };
 
@@ -126,6 +126,42 @@ export const WEEKLY_SALES_DATA = {
   ]
 };
 
+// Generate Mock Sales for dynamic calculations based on the weekly data
+const generateMockSales = (): Sale[] => {
+    const sales: Sale[] = [];
+    const days = 7;
+    const now = new Date();
+    
+    // Create sales for last 7 days for BR001 and BR002 to show some data
+    ['BR001', 'BR002'].forEach(branchId => {
+        for(let i=0; i<days; i++) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString();
+            
+            // 5 transactions per day per branch
+            for(let j=0; j<5; j++) {
+                const amount = Math.floor(Math.random() * 50000) + 5000;
+                const cost = amount * 0.7; // 30% margin
+                sales.push({
+                    id: `SALE-${branchId}-${i}-${j}`,
+                    date: dateStr,
+                    branchId: branchId,
+                    items: [], // Simplified for stats
+                    totalAmount: amount,
+                    totalCost: cost,
+                    profit: amount - cost,
+                    paymentMethod: PaymentMethod.CASH,
+                    status: 'COMPLETED'
+                });
+            }
+        }
+    });
+    return sales;
+};
+
+export const MOCK_SALES: Sale[] = generateMockSales();
+
 export const STOCK_TRANSFERS: StockTransfer[] = [
   {
     id: 'TR-2023-889',
@@ -178,6 +214,8 @@ export const MOCK_INVOICES: Invoice[] = [
     paidAmount: 1000000,
     status: 'PARTIAL',
     description: 'Bulk Supply of Antibiotics',
+    source: 'MANUAL',
+    items: [],
     payments: [
       { id: 'PAY-001', amount: 1000000, date: '2023-10-05', receiptNumber: 'REC-998877', method: PaymentMethod.MOBILE_MONEY, recordedBy: 'Juma M' }
     ]
@@ -192,6 +230,8 @@ export const MOCK_INVOICES: Invoice[] = [
     paidAmount: 0,
     status: 'UNPAID',
     description: 'Monthly Consumables',
+    source: 'MANUAL',
+    items: [],
     payments: []
   },
   {
@@ -204,6 +244,8 @@ export const MOCK_INVOICES: Invoice[] = [
     paidAmount: 450000,
     status: 'PAID',
     description: 'First Aid Kit Replenishment',
+    source: 'MANUAL',
+    items: [],
     payments: [
        { id: 'PAY-002', amount: 450000, date: '2023-10-22', receiptNumber: 'REC-998900', method: PaymentMethod.CASH, recordedBy: 'Juma M' }
     ]

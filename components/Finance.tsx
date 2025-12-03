@@ -1,15 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area
+  PieChart, Pie, Cell
 } from 'recharts';
 import {
-  DollarSign, TrendingUp, TrendingDown, Receipt, CreditCard,
-  FileText, Plus, Download, Filter, Wallet, Building, Calendar, CheckCircle, FilePlus, User, X
+  DollarSign, TrendingUp, TrendingDown, Receipt,
+  FileText, Plus, X, Printer, Store, Wallet, Building, CheckCircle, FilePlus, User, Eye
 } from 'lucide-react';
-import { BRANCH_FINANCE_STATS, BRANCHES, WEEKLY_SALES_DATA, MOCK_INVOICES, INITIAL_EXPENSES } from '../data/mockData';
-import { Invoice, PaymentMethod } from '../types';
+import { BRANCHES } from '../data/mockData';
+import { Invoice, PaymentMethod, Expense, Sale } from '../types';
 
 const PAYMENT_METHODS_DATA = [
   { name: 'Cash', value: 4500000 },
@@ -20,17 +20,23 @@ const PAYMENT_METHODS_DATA = [
 
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#64748b'];
 
-const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
+interface FinanceProps {
+    currentBranchId: string;
+    invoices: Invoice[];
+    expenses: Expense[];
+    sales: Sale[];
+    onProcessPayment: (invoice: Invoice) => void;
+    onCreateExpense: (expense: Expense) => void;
+}
+
+const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, sales, onProcessPayment, onCreateExpense }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'expenses' | 'tax'>('overview');
-  
-  // Data State
-  const [invoices, setInvoices] = useState<Invoice[]>(MOCK_INVOICES);
-  const [expenses, setExpenses] = useState(INITIAL_EXPENSES);
   
   // Modal State
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false); // New Preview Modal
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   // Form States
@@ -46,12 +52,40 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
 
   // Filter Data Logic
-  const stats = (BRANCH_FINANCE_STATS as any)[currentBranchId] || BRANCH_FINANCE_STATS['HEAD_OFFICE'];
-  const chartData = (WEEKLY_SALES_DATA as any)[currentBranchId] || WEEKLY_SALES_DATA['BR001'];
-  
-  const filteredExpenses = isHeadOffice ? expenses : expenses.filter(e => e.branchId === currentBranchId);
   const filteredInvoices = isHeadOffice ? invoices : invoices.filter(i => i.branchId === currentBranchId);
-  const incomeVsExpenseData = chartData.map((d: any) => ({ ...d, expense: d.revenue * 0.7 })); // Mock logic
+  const filteredExpenses = isHeadOffice ? expenses : expenses.filter(e => e.branchId === currentBranchId);
+  const filteredSales = isHeadOffice ? sales : sales.filter(s => s.branchId === currentBranchId);
+
+  // DYNAMIC CALCULATIONS
+  const stats = useMemo(() => {
+    const revenue = filteredSales.reduce((acc, curr) => acc + curr.totalAmount, 0);
+    const profit = filteredSales.reduce((acc, curr) => acc + curr.profit, 0);
+    const totalExpenses = filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+    const netProfit = profit - totalExpenses;
+    const receivables = filteredInvoices.reduce((acc, i) => acc + (i.totalAmount - i.paidAmount), 0);
+
+    return { revenue, netProfit, totalExpenses, receivables };
+  }, [filteredSales, filteredExpenses, filteredInvoices]);
+
+  // Income Vs Expense Chart Data
+  const incomeVsExpenseData = useMemo(() => {
+      const last7Days = Array.from({length: 7}, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().split('T')[0];
+      });
+
+      return last7Days.map(dateStr => {
+          const daySales = filteredSales.filter(s => s.date.startsWith(dateStr));
+          const dayExpenses = filteredExpenses.filter(e => e.date === dateStr);
+          
+          return {
+              name: new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' }),
+              sales: daySales.reduce((sum, s) => sum + s.totalAmount, 0),
+              expense: dayExpenses.reduce((sum, e) => sum + e.amount, 0)
+          };
+      });
+  }, [filteredSales, filteredExpenses]);
 
   const handleCreateInvoice = () => {
     if(!newInvoice.customer || !newInvoice.amount) return;
@@ -66,10 +100,12 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
       paidAmount: 0,
       status: 'UNPAID',
       description: newInvoice.description || 'General Supplies',
+      source: 'MANUAL',
+      items: [],
       payments: []
     };
 
-    setInvoices([invoice, ...invoices]);
+    onProcessPayment(invoice); // Using shared handler to add to list
     setShowInvoiceModal(false);
     setNewInvoice({ customer: '', amount: '', description: '', due: '' });
   };
@@ -78,35 +114,30 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
     if(!selectedInvoice || !newPayment.amount || !newPayment.receipt) return;
     
     const amount = parseFloat(newPayment.amount);
+    const newPaidAmount = selectedInvoice.paidAmount + amount;
     
-    const updatedInvoices = invoices.map(inv => {
-      if(inv.id === selectedInvoice.id) {
-        const newPaidAmount = inv.paidAmount + amount;
-        let newStatus: Invoice['status'] = 'PARTIAL';
-        if(newPaidAmount >= inv.totalAmount) newStatus = 'PAID';
-        if(newPaidAmount === 0) newStatus = 'UNPAID';
+    let newStatus: Invoice['status'] = 'PARTIAL';
+    if(newPaidAmount >= selectedInvoice.totalAmount) newStatus = 'PAID';
+    if(newPaidAmount === 0) newStatus = 'UNPAID';
 
-        return {
-          ...inv,
-          paidAmount: newPaidAmount,
-          status: newStatus,
-          payments: [
-            ...inv.payments,
+    const updatedInvoice: Invoice = {
+        ...selectedInvoice,
+        paidAmount: newPaidAmount,
+        status: newStatus,
+        payments: [
+            ...selectedInvoice.payments,
             {
-              id: `PAY-${Date.now()}`,
-              amount: amount,
-              date: new Date().toISOString().split('T')[0],
-              receiptNumber: newPayment.receipt,
-              method: newPayment.method,
-              recordedBy: 'Current User'
+                id: `PAY-${Date.now()}`,
+                amount: amount,
+                date: new Date().toISOString().split('T')[0],
+                receiptNumber: newPayment.receipt,
+                method: newPayment.method,
+                recordedBy: 'Current User'
             }
-          ]
-        };
-      }
-      return inv;
-    });
+        ]
+    };
 
-    setInvoices(updatedInvoices);
+    onProcessPayment(updatedInvoice); // This triggers inventory deduction in App.tsx if fully paid
     setShowPaymentModal(false);
     setSelectedInvoice(null);
     setNewPayment({ amount: '', receipt: '', method: PaymentMethod.CASH });
@@ -115,7 +146,7 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const handleRecordExpense = () => {
     if (!newExpense.description || !newExpense.amount) return;
 
-    const expense = {
+    const expense: Expense = {
       id: Date.now(),
       category: newExpense.category,
       description: newExpense.description,
@@ -125,8 +156,7 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
       branchId: currentBranchId
     };
 
-    // @ts-ignore
-    setExpenses([expense, ...expenses]);
+    onCreateExpense(expense);
     setShowExpenseModal(false);
     setNewExpense({
       description: '',
@@ -135,6 +165,15 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
       date: new Date().toISOString().split('T')[0]
     });
     alert("Expense recorded successfully! It has been sent to Head Office for approval.");
+  };
+
+  const handleViewInvoice = (inv: Invoice) => {
+    setSelectedInvoice(inv);
+    setShowPreviewModal(true);
+  };
+
+  const handlePrintInvoice = () => {
+      window.print();
   };
 
   return (
@@ -147,7 +186,7 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
              {isHeadOffice ? 'Global Financial Overview' : `Financials for ${BRANCHES.find(b => b.id === currentBranchId)?.name}`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
            <button 
              onClick={() => setActiveTab('overview')}
              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === 'overview' ? 'bg-teal-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
@@ -158,7 +197,7 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
              onClick={() => setActiveTab('invoices')}
              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === 'invoices' ? 'bg-teal-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
            >
-             Invoicing
+             Invoicing & POS
            </button>
            <button 
              onClick={() => setActiveTab('expenses')}
@@ -179,17 +218,17 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
            {/* KPI Cards */}
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard title="Gross Revenue" value={`TZS ${(stats.revenue / 1000000).toFixed(1)}M`} subtext="This Month" icon={DollarSign} color="bg-emerald-600" />
-              <StatCard title="Net Profit" value={`TZS ${(stats.profit / 1000000).toFixed(1)}M`} subtext="After Tax & Exp" icon={TrendingUp} color="bg-teal-600" />
-              <StatCard title="Total Expenses" value={`TZS ${(stats.expenses / 1000000).toFixed(1)}M`} subtext={`${filteredExpenses.length} Transactions`} icon={TrendingDown} color="bg-rose-500" />
-              <StatCard title="Outstanding Invoices" value={`TZS ${(filteredInvoices.reduce((acc, i) => acc + (i.totalAmount - i.paidAmount), 0)/1000000).toFixed(1)}M`} subtext="Receivables" icon={FileText} color="bg-blue-500" />
+              <StatCard title="Gross Revenue" value={`TZS ${(stats.revenue / 1000000).toFixed(2)}M`} subtext="All Time" icon={DollarSign} color="bg-emerald-600" />
+              <StatCard title="Net Profit" value={`TZS ${(stats.netProfit / 1000000).toFixed(2)}M`} subtext="After Tax & Exp" icon={TrendingUp} color="bg-teal-600" />
+              <StatCard title="Total Expenses" value={`TZS ${(stats.totalExpenses / 1000000).toFixed(2)}M`} subtext={`${filteredExpenses.length} Transactions`} icon={TrendingDown} color="bg-rose-500" />
+              <StatCard title="Outstanding Invoices" value={`TZS ${(stats.receivables/1000000).toFixed(2)}M`} subtext="Receivables" icon={FileText} color="bg-blue-500" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Income vs Expense Chart */}
               <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
-                   <h3 className="text-lg font-bold text-slate-800">Income vs Expenses (Weekly)</h3>
+                   <h3 className="text-lg font-bold text-slate-800">Income vs Expenses (7 Days)</h3>
                 </div>
                 <div className="h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -245,13 +284,13 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
 
       {activeTab === 'invoices' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-           <div className="flex justify-between items-center mb-6">
+           <div className="flex justify-between items-center mb-6 no-print">
                 <h3 className="text-lg font-bold text-slate-800">Invoices & Receivables</h3>
                 <button 
                   onClick={() => setShowInvoiceModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium text-sm shadow-md shadow-teal-600/20"
                 >
-                    <FilePlus size={16} /> Create Invoice
+                    <FilePlus size={16} /> Create Manual Invoice
                 </button>
            </div>
            
@@ -260,8 +299,8 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                    <thead className="bg-slate-50 border-b border-slate-200">
                        <tr>
                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Invoice ID</th>
+                           <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Origin</th>
                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Customer</th>
-                           <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Date Issued</th>
                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Total Amount</th>
                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Paid / Balance</th>
                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Status</th>
@@ -275,10 +314,20 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                            <tr key={inv.id} className="hover:bg-slate-50">
                                <td className="px-6 py-4 font-mono text-sm text-slate-600">{inv.id}</td>
                                <td className="px-6 py-4">
+                                   {inv.source === 'POS' ? (
+                                       <span className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit">
+                                           <Store size={10} /> POS
+                                       </span>
+                                   ) : (
+                                       <span className="flex items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded w-fit">
+                                           <FileText size={10} /> Manual
+                                       </span>
+                                   )}
+                               </td>
+                               <td className="px-6 py-4">
                                    <div className="font-bold text-slate-800 text-sm">{inv.customerName}</div>
                                    <div className="text-xs text-slate-500">{inv.description}</div>
                                </td>
-                               <td className="px-6 py-4 text-sm text-slate-600">{inv.dateIssued}</td>
                                <td className="px-6 py-4 font-bold text-slate-800">TZS {inv.totalAmount.toLocaleString()}</td>
                                <td className="px-6 py-4 text-sm">
                                    <div className="flex flex-col">
@@ -296,19 +345,27 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                                    </span>
                                </td>
                                <td className="px-6 py-4">
-                                   {inv.status !== 'PAID' && (
-                                     <button 
-                                       onClick={() => { setSelectedInvoice(inv); setShowPaymentModal(true); }}
-                                       className="text-teal-600 hover:text-teal-800 font-medium text-xs flex items-center gap-1"
-                                     >
-                                        <Wallet size={12} /> Record Payment
-                                     </button>
-                                   )}
-                                   {inv.status === 'PAID' && (
-                                     <span className="text-slate-400 text-xs flex items-center gap-1">
-                                       <CheckCircle size={12} /> Closed
-                                     </span>
-                                   )}
+                                   <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => handleViewInvoice(inv)}
+                                            className="text-slate-500 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded" 
+                                            title="View Invoice"
+                                        >
+                                            <Eye size={16} />
+                                        </button>
+                                       {inv.status !== 'PAID' ? (
+                                         <button 
+                                           onClick={() => { setSelectedInvoice(inv); setShowPaymentModal(true); }}
+                                           className="text-teal-600 hover:text-teal-800 font-bold text-xs bg-teal-50 px-2 py-1 rounded hover:bg-teal-100 flex items-center gap-1 transition-colors"
+                                         >
+                                            <Wallet size={12} /> Pay Now
+                                         </button>
+                                       ) : (
+                                          <span className="text-slate-400 text-xs flex items-center gap-1 px-2">
+                                              <CheckCircle size={12} /> Paid
+                                          </span>
+                                       )}
+                                   </div>
                                </td>
                            </tr>
                          )
@@ -321,7 +378,7 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
 
       {activeTab === 'expenses' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 no-print">
                 <h3 className="text-lg font-bold text-slate-800">Operational Expenses</h3>
                 {!isHeadOffice && (
                 <button 
@@ -399,9 +456,9 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
         </div>
       )}
 
-      {/* Invoice Modal */}
+      {/* Invoice Modal (New) */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-2xl w-full max-w-md p-6">
                 <h3 className="text-xl font-bold text-slate-900 mb-4">Create New Invoice</h3>
                 <div className="space-y-4">
@@ -460,7 +517,7 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
 
       {/* Payment Modal */}
       {showPaymentModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-2xl w-full max-w-md p-6">
                 <h3 className="text-xl font-bold text-slate-900 mb-1">Record Payment</h3>
                 <p className="text-sm text-slate-500 mb-4">For Invoice #{selectedInvoice.id}</p>
@@ -522,9 +579,130 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
         </div>
       )}
 
+      {/* Preview Invoice Modal (New) */}
+      {showPreviewModal && selectedInvoice && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
+              <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                  <div className="p-4 bg-slate-800 text-white flex justify-between items-center">
+                       <h3 className="font-bold flex items-center gap-2">
+                           <FileText size={18} className="text-blue-400"/> Invoice Preview
+                       </h3>
+                       <button onClick={() => setShowPreviewModal(false)} className="text-slate-400 hover:text-white">
+                           <X size={20} />
+                       </button>
+                   </div>
+                   
+                   <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
+                       <div className="bg-white border border-slate-200 p-8 shadow-sm text-sm">
+                           {/* Invoice Header */}
+                           <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
+                               <div>
+                                   <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wide">
+                                       {selectedInvoice.status === 'PAID' ? 'Tax Invoice' : 'Proforma Invoice'}
+                                   </h1>
+                                   <p className="text-slate-500 mt-1">Invoice #: {selectedInvoice.id}</p>
+                                   <p className="text-slate-500">Date: {selectedInvoice.dateIssued}</p>
+                                   <p className="text-slate-500">Due Date: {selectedInvoice.dueDate}</p>
+                                   <span className={`inline-block px-2 py-0.5 mt-2 rounded text-xs font-bold ${
+                                       selectedInvoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                   }`}>
+                                       {selectedInvoice.status}
+                                   </span>
+                               </div>
+                               <div className="text-right">
+                                   <h2 className="font-bold text-slate-900 text-lg">PMS Pharmacy</h2>
+                                   <p className="text-slate-500">TIN: 123-456-789</p>
+                                   <p className="text-slate-500">VRN: 40-001234</p>
+                                   <p className="text-slate-500 mt-2">Bill To:</p>
+                                   <p className="font-bold text-slate-800 text-lg">{selectedInvoice.customerName}</p>
+                               </div>
+                           </div>
+                           
+                           {/* Items Table */}
+                           <table className="w-full text-left mb-6">
+                               <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                   <tr>
+                                       <th className="py-2 pl-2">Item Description</th>
+                                       <th className="py-2 text-center">Qty</th>
+                                       <th className="py-2 text-right">Unit Price</th>
+                                       <th className="py-2 text-right pr-2">Total</th>
+                                   </tr>
+                               </thead>
+                               <tbody className="divide-y divide-slate-100">
+                                   {selectedInvoice.items && selectedInvoice.items.length > 0 ? selectedInvoice.items.map((item, idx) => (
+                                       <tr key={idx}>
+                                           <td className="py-3 pl-2 font-medium">{item.name}</td>
+                                           <td className="py-3 text-center">{item.quantity}</td>
+                                           <td className="py-3 text-right">{item.price.toLocaleString()}</td>
+                                           <td className="py-3 text-right pr-2">{(item.price * item.quantity).toLocaleString()}</td>
+                                       </tr>
+                                   )) : (
+                                       <tr>
+                                           <td colSpan={4} className="py-4 pl-2 text-slate-500 italic">
+                                               {selectedInvoice.description || 'Consolidated Invoice Items'}
+                                           </td>
+                                       </tr>
+                                   )}
+                               </tbody>
+                           </table>
+                           
+                           {/* Totals */}
+                           <div className="flex justify-end">
+                               <div className="w-64 space-y-2">
+                                   <div className="flex justify-between text-slate-500">
+                                       <span>Subtotal:</span>
+                                       <span>{(selectedInvoice.totalAmount / 1.18).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                                   </div>
+                                   <div className="flex justify-between text-slate-500">
+                                       <span>VAT (18%):</span>
+                                       <span>{(selectedInvoice.totalAmount - (selectedInvoice.totalAmount / 1.18)).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                                   </div>
+                                   <div className="flex justify-between font-bold text-xl text-slate-900 border-t border-slate-200 pt-3">
+                                       <span>Grand Total:</span>
+                                       <span>{selectedInvoice.totalAmount.toLocaleString()} TZS</span>
+                                   </div>
+                                   <div className="flex justify-between text-emerald-600 font-medium pt-1">
+                                       <span>Amount Paid:</span>
+                                       <span>- {selectedInvoice.paidAmount.toLocaleString()}</span>
+                                   </div>
+                                   <div className="flex justify-between text-rose-600 font-bold border-t border-slate-100 pt-2">
+                                       <span>Balance Due:</span>
+                                       <span>{(selectedInvoice.totalAmount - selectedInvoice.paidAmount).toLocaleString()} TZS</span>
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+
+                   <div className="p-4 bg-white border-t border-slate-100 flex justify-end gap-3">
+                       <button 
+                           onClick={() => setShowPreviewModal(false)}
+                           className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-lg border border-slate-200"
+                       >
+                          Close
+                       </button>
+                       <button 
+                           onClick={handlePrintInvoice}
+                           className="px-4 py-2 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-900 flex items-center gap-2"
+                       >
+                          <Printer size={16} /> Print
+                       </button>
+                       {selectedInvoice.status !== 'PAID' && (
+                           <button 
+                               onClick={() => { setShowPreviewModal(false); setShowPaymentModal(true); }}
+                               className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-md flex items-center gap-2"
+                           >
+                              <Wallet size={16} /> Process Payment
+                           </button>
+                       )}
+                   </div>
+              </div>
+          </div>
+      )}
+
       {/* Record Expense Modal */}
       {showExpenseModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">Record Expense</h3>
@@ -595,6 +773,61 @@ const Finance: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
           </div>
         </div>
       )}
+
+      {/* Print View Hidden on Screen - Visible only during print via CSS class */}
+      <div className="print-only">
+           <div className="max-w-xl mx-auto border border-black p-8 text-black">
+                <div className="text-center mb-6">
+                    <h1 className="text-2xl font-bold uppercase">PMS Pharmacy</h1>
+                    <p>TIN: 123-456-789 | VRN: 40-001234</p>
+                    <p>Bagamoyo Road, Dar es Salaam</p>
+                    <p>Tel: +255 700 123 456</p>
+                </div>
+                <hr className="border-black my-4"/>
+                <div className="flex justify-between font-bold text-lg mb-2">
+                    <span>{selectedInvoice?.status === 'PAID' ? 'TAX INVOICE' : 'PROFORMA INVOICE'}</span>
+                </div>
+                <p>Invoice #: {selectedInvoice?.id || '---'}</p>
+                <p>Date: {selectedInvoice?.dateIssued || new Date().toISOString().split('T')[0]}</p>
+                <p>Customer: {selectedInvoice?.customerName}</p>
+                <hr className="border-black my-4"/>
+                <table className="w-full text-left mb-6">
+                    <thead>
+                        <tr className="border-b border-black">
+                            <th className="py-2">Item</th>
+                            <th className="py-2 text-right">Qty</th>
+                            <th className="py-2 text-right">Price</th>
+                            <th className="py-2 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {selectedInvoice?.items?.map((item, idx) => (
+                             <tr key={idx}>
+                                 <td className="py-2">{item.name}</td>
+                                 <td className="py-2 text-right">{item.quantity}</td>
+                                 <td className="py-2 text-right">{item.price.toLocaleString()}</td>
+                                 <td className="py-2 text-right">{(item.price * item.quantity).toLocaleString()}</td>
+                             </tr>
+                        )) || (
+                            <tr>
+                                <td colSpan={4} className="py-4 text-center">Consolidated Invoice Service</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+                <hr className="border-black my-4"/>
+                <div className="flex justify-between font-bold text-xl">
+                    <span>TOTAL</span>
+                    <span>{selectedInvoice?.totalAmount.toLocaleString()} TZS</span>
+                </div>
+                {selectedInvoice?.status === 'PAID' && (
+                     <div className="mt-2 text-center border border-black p-2 font-bold">PAID IN FULL</div>
+                )}
+                <div className="mt-8 text-center text-sm">
+                    <p>Thank you for your business!</p>
+                </div>
+           </div>
+      </div>
     </div>
   );
 };
