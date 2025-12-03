@@ -38,10 +38,13 @@ export interface Staff {
   password?: string; // Added for Auth (Mock only - in real app this is hashed)
 }
 
+export type BatchStatus = 'ACTIVE' | 'ON_HOLD' | 'REJECTED' | 'EXPIRED';
+
 export interface DrugBatch {
   batchNumber: string;
   expiryDate: string; // ISO Date
   quantity: number;
+  status: BatchStatus; // Added for Release Protocol
 }
 
 export interface Product {
@@ -139,6 +142,37 @@ export interface StockRequisition {
   }[];
 }
 
+// Stock Release Request (New Protocol)
+export interface StockReleaseRequest {
+  id: string;
+  branchId: string;
+  requestedBy: string;
+  date: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  items: {
+    productId: string;
+    productName: string;
+    batchNumber: string;
+    quantity: number;
+  }[];
+}
+
+// Disposal Request (Expired Stock)
+export interface DisposalRequest {
+  id: string;
+  branchId: string;
+  requestedBy: string;
+  date: string;
+  status: 'PENDING' | 'APPROVED' | 'COMPLETED';
+  items: {
+    productId: string;
+    productName: string;
+    batchNumber: string;
+    quantity: number;
+    reason: string;
+  }[];
+}
+
 // Invoicing Types
 export interface InvoicePayment {
   id: string;
@@ -159,6 +193,8 @@ export interface Invoice {
   paidAmount: number;
   status: 'PAID' | 'PARTIAL' | 'UNPAID' | 'OVERDUE';
   description: string;
+  source: 'POS' | 'MANUAL'; // Logic to distinguish Proforma from Manual Invoice
+  items?: CartItem[]; // Items from POS
   payments: InvoicePayment[];
 }
 

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -15,15 +15,8 @@ import {
   Cell
 } from 'recharts';
 import { TrendingUp, AlertTriangle, DollarSign, Users, Store } from 'lucide-react';
-import { WEEKLY_SALES_DATA, BRANCH_FINANCE_STATS, BRANCHES, PRODUCTS } from '../data/mockData';
-import { BranchInventoryItem } from '../types';
-
-const branchPerformance = [
-  { name: 'Kariakoo', value: 45000000 },
-  { name: 'Masaki', value: 32000000 },
-  { name: 'Mbezi Beach', value: 18000000 },
-  { name: 'Dodoma', value: 12000000 },
-];
+import { BRANCHES, PRODUCTS } from '../data/mockData';
+import { BranchInventoryItem, Sale, Expense } from '../types';
 
 const COLORS = ['#0f766e', '#14b8a6', '#5eead4', '#ccfbf1'];
 
@@ -51,34 +44,88 @@ const StatCard = ({ title, value, subtext, icon: Icon, color }: any) => (
 interface DashboardProps {
   currentBranchId: string;
   inventory: Record<string, BranchInventoryItem[]>;
+  sales: Sale[];
+  expenses: Expense[];
   onViewInventory: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onViewInventory }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales, expenses, onViewInventory }) => {
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
-  
-  // Dynamic Data Selection based on Branch Context
-  const stats = (BRANCH_FINANCE_STATS as any)[currentBranchId] || BRANCH_FINANCE_STATS['HEAD_OFFICE'];
-  const chartData = (WEEKLY_SALES_DATA as any)[currentBranchId] || (WEEKLY_SALES_DATA as any)['BR001']; 
-
   const activeBranchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
 
-  // Calculate Low Stock Alerts using Prop Inventory
+  // DYNAMIC CALCULATIONS
+  const dashboardStats = useMemo(() => {
+      // 1. Filter Data by Branch
+      const filteredSales = sales.filter(s => isHeadOffice || s.branchId === currentBranchId);
+      const filteredExpenses = expenses.filter(e => isHeadOffice || e.branchId === currentBranchId);
+      
+      // 2. Calculate Totals
+      const revenue = filteredSales.reduce((acc, curr) => acc + curr.totalAmount, 0);
+      const grossProfit = filteredSales.reduce((acc, curr) => acc + curr.profit, 0);
+      const totalExpenses = filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+      const netProfit = grossProfit - totalExpenses;
+      const transactions = filteredSales.length;
+
+      return { revenue, netProfit, transactions };
+  }, [sales, expenses, currentBranchId, isHeadOffice]);
+
+  // DYNAMIC CHART DATA
+  const chartData = useMemo(() => {
+      const filteredSales = sales.filter(s => isHeadOffice || s.branchId === currentBranchId);
+      
+      // Group by Day (Last 7 Days)
+      const last7Days = Array.from({length: 7}, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().split('T')[0];
+      });
+
+      return last7Days.map(dateStr => {
+          const daySales = filteredSales.filter(s => s.date.startsWith(dateStr));
+          const dailyRevenue = daySales.reduce((sum, s) => sum + s.totalAmount, 0);
+          const dailyCount = daySales.length;
+          const dateObj = new Date(dateStr);
+          return {
+              name: dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
+              sales: dailyCount * 10, // scaling for visual if needed, or just use revenue
+              revenue: dailyRevenue
+          };
+      });
+  }, [sales, currentBranchId, isHeadOffice]);
+
+  // BRANCH DISTRIBUTION DATA (For Head Office)
+  const branchPerformance = useMemo(() => {
+      if (!isHeadOffice) return [];
+      const branchRevenueMap: Record<string, number> = {};
+      sales.forEach(s => {
+          branchRevenueMap[s.branchId] = (branchRevenueMap[s.branchId] || 0) + s.totalAmount;
+      });
+
+      return Object.entries(branchRevenueMap).map(([bId, val]) => ({
+          name: BRANCHES.find(b => b.id === bId)?.name || bId,
+          value: val
+      }));
+  }, [sales, isHeadOffice]);
+
+
+  // DYNAMIC STOCK ALERTS
   let lowStockCount = 0;
   const criticalItems: {name: string, stock: number, branch: string}[] = [];
-
   const branchesToCheck = isHeadOffice ? Object.keys(inventory) : [currentBranchId];
   
   branchesToCheck.forEach(bId => {
       const stockList = inventory[bId] || [];
       stockList.forEach(item => {
           const productDef = PRODUCTS.find(p => p.id === item.productId);
-          if (productDef && item.quantity <= productDef.minStockLevel) {
+          // Calculate ACTIVE stock only
+          const activeStock = item.batches.filter(b => b.status === 'ACTIVE').reduce((sum, b) => sum + b.quantity, 0);
+
+          if (productDef && activeStock <= productDef.minStockLevel) {
               lowStockCount++;
               if (criticalItems.length < 5) {
                   criticalItems.push({
                       name: productDef.name,
-                      stock: item.quantity,
+                      stock: activeStock,
                       branch: BRANCHES.find(b => b.id === bId)?.name || bId
                   });
               }
@@ -88,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onVie
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h2 className="text-3xl font-bold text-slate-900">{isHeadOffice ? 'Head Office Overview' : `${activeBranchName} Overview`}</h2>
         <p className="text-slate-500 mt-1">
@@ -102,30 +149,30 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onVie
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="Total Revenue (Monthly)" 
-          value={`TZS ${(stats.revenue / 1000000).toFixed(1)}M`} 
-          subtext="+12.5%" 
+          title="Total Revenue (All Time)" 
+          value={`TZS ${(dashboardStats.revenue / 1000000).toFixed(2)}M`} 
+          subtext="Dynamic" 
           icon={DollarSign} 
           color="bg-emerald-600" 
         />
         <StatCard 
           title="Transactions" 
-          value={isHeadOffice ? "3,420" : "850"} 
-          subtext="+5.2%" 
+          value={dashboardStats.transactions.toLocaleString()} 
+          subtext="Processed" 
           icon={Users} 
           color="bg-blue-600" 
         />
         <StatCard 
           title="Stock Alerts" 
           value={`${lowStockCount} Items`} 
-          subtext="Low Stock Level" 
+          subtext="Below Min Level" 
           icon={AlertTriangle} 
           color="bg-amber-500" 
         />
         <StatCard 
           title="Net Profit" 
-          value={`TZS ${(stats.profit / 1000000).toFixed(1)}M`} 
-          subtext="+8.1%" 
+          value={`TZS ${(dashboardStats.netProfit / 1000000).toFixed(2)}M`} 
+          subtext="Rev - Cost - Exp" 
           icon={TrendingUp} 
           color="bg-teal-600" 
         />
@@ -137,7 +184,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onVie
         {/* Main Sales Chart */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <h3 className="text-lg font-bold text-slate-800 mb-6">
-             {isHeadOffice ? 'Global Sales Analytics' : 'Branch Sales Analytics'}
+             {isHeadOffice ? 'Global Sales Analytics (7 Days)' : 'Branch Sales Analytics (7 Days)'}
           </h3>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -172,7 +219,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onVie
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center">
-                <span className="text-3xl font-bold text-teal-800">4</span>
+                <span className="text-3xl font-bold text-teal-800">{branchPerformance.length}</span>
                 <p className="text-xs text-slate-500 uppercase">Branches</p>
               </div>
             </div>
@@ -181,7 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onVie
             {branchPerformance.map((branch, index) => (
               <div key={branch.name} className="flex items-center justify-between text-sm">
                 <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[index] }}></div>
+                  <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
                   <span className="text-slate-600">{branch.name}</span>
                 </div>
                 <span className="font-medium text-slate-900">{(branch.value / 1000000).toFixed(1)}M</span>
@@ -195,8 +242,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onVie
                <Store size={40} className="text-teal-600" />
              </div>
              <h3 className="text-xl font-bold text-slate-800 mb-2">{activeBranchName}</h3>
-             <p className="text-slate-500 mb-6">Performance is good. You are 12% above the target for this month.</p>
-             <button className="text-teal-600 font-bold hover:underline">View Detailed Report</button>
+             <p className="text-slate-500 mb-6">Performance is solid. Keep monitoring stock levels.</p>
+             <button onClick={onViewInventory} className="text-teal-600 font-bold hover:underline">Manage Stock</button>
           </div>
         )}
       </div>
@@ -214,7 +261,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, onVie
             <tr>
               <th className="px-6 py-4">Product Name</th>
               <th className="px-6 py-4">Branch</th>
-              <th className="px-6 py-4">Current Stock</th>
+              <th className="px-6 py-4">Active Stock</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Action</th>
             </tr>
@@ -252,10 +299,9 @@ const AreaChartComponent = ({ data }: { data: any[] }) => {
             <Tooltip 
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 itemStyle={{ color: '#0f766e', fontWeight: 600 }}
-                formatter={(value: number) => [`TZS ${value.toLocaleString()}`, 'Sales']}
+                formatter={(value: number) => [`TZS ${value.toLocaleString()}`, 'Revenue']}
             />
-            <Line type="monotone" dataKey="sales" stroke="#0d9488" strokeWidth={3} activeDot={{ r: 8 }} dot={false} />
-            <Line type="monotone" dataKey="revenue" stroke="#94a3b8" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+            <Line type="monotone" dataKey="revenue" stroke="#0d9488" strokeWidth={3} activeDot={{ r: 8 }} dot={false} />
         </LineChart>
     );
 };

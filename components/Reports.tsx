@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, AreaChart, Area, Legend
@@ -20,31 +20,73 @@ import {
 } from 'lucide-react';
 import { 
   BRANCHES, 
-  WEEKLY_SALES_DATA, 
-  BRANCH_FINANCE_STATS, 
   MOCK_AUDIT_LOGS,
   CATEGORY_PERFORMANCE,
   PRODUCTS
 } from '../data/mockData';
-import { AuditLog, BranchInventoryItem } from '../types';
+import { AuditLog, BranchInventoryItem, Sale, Expense } from '../types';
 
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#f43f5e', '#64748b'];
 
 interface ReportsProps {
   currentBranchId: string;
   inventory: Record<string, BranchInventoryItem[]>;
+  sales: Sale[];
+  expenses: Expense[];
 }
 
-const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory }) => {
+const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory, sales, expenses }) => {
   const [activeTab, setActiveTab] = useState<'finance' | 'inventory' | 'audit'>('finance');
   const [auditFilter, setAuditFilter] = useState('');
   
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
 
-  // Data Filtering
-  const salesData = (WEEKLY_SALES_DATA as any)[currentBranchId] || (WEEKLY_SALES_DATA as any)['BR001'];
-  const financeStats = (BRANCH_FINANCE_STATS as any)[currentBranchId] || BRANCH_FINANCE_STATS['HEAD_OFFICE'];
+  // DYNAMIC FILTERING
+  const filteredSales = useMemo(() => isHeadOffice ? sales : sales.filter(s => s.branchId === currentBranchId), [sales, currentBranchId, isHeadOffice]);
+  const filteredExpenses = useMemo(() => isHeadOffice ? expenses : expenses.filter(e => e.branchId === currentBranchId), [expenses, currentBranchId, isHeadOffice]);
+
+  // Calculate Finance Stats
+  const financeStats = useMemo(() => {
+    const revenue = filteredSales.reduce((acc, curr) => acc + curr.totalAmount, 0);
+    const profit = filteredSales.reduce((acc, curr) => acc + curr.profit, 0);
+    const expenseTotal = filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+    return { revenue, profit, expenses: expenseTotal };
+  }, [filteredSales, filteredExpenses]);
+
+  // Chart Data: Sales per Day
+  const chartData = useMemo(() => {
+      const last7Days = Array.from({length: 7}, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().split('T')[0];
+      });
+
+      return last7Days.map(dateStr => {
+          const daySales = filteredSales.filter(s => s.date.startsWith(dateStr));
+          return {
+              name: new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' }),
+              sales: daySales.reduce((sum, s) => sum + s.totalAmount, 0)
+          };
+      });
+  }, [filteredSales]);
+
+  // Valuation Data
+  const valuationStats = useMemo(() => {
+     let totalVal = 0;
+     const branchesToCheck = isHeadOffice ? Object.keys(inventory) : [currentBranchId];
+     branchesToCheck.forEach(bId => {
+         const items = inventory[bId] || [];
+         items.forEach(i => {
+             const product = PRODUCTS.find(p => p.id === i.productId);
+             if (product) {
+                 totalVal += i.quantity * product.costPrice;
+             }
+         });
+     });
+     return totalVal;
+  }, [inventory, currentBranchId, isHeadOffice]);
+
   
   const filteredAuditLogs = MOCK_AUDIT_LOGS.filter(log => {
       const matchBranch = isHeadOffice ? true : log.branchId === currentBranchId;
@@ -96,20 +138,20 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory }) => {
     const filename = `PMS_${activeTab}_Report_${branchName?.replace(/\s+/g, '_')}_${dateStr}.csv`;
 
     if (activeTab === 'finance') {
-        dataToExport = salesData.map((d: any) => ({
-            Date: dateStr, 
-            Day: d.name,
-            Sales_Count: d.sales / 1000, // Mock calculation
-            Revenue_TZS: d.revenue,
-            Branch: branchName
+        dataToExport = filteredSales.map((s: Sale) => ({
+            ID: s.id,
+            Date: s.date, 
+            Total_Amount: s.totalAmount,
+            Profit: s.profit,
+            Payment_Method: s.paymentMethod,
+            Branch: BRANCHES.find(b => b.id === s.branchId)?.name || s.branchId
         }));
         // Append summary row
         dataToExport.push({});
         dataToExport.push({
-            Day: 'TOTAL_SUMMARY',
-            Revenue_TZS: financeStats.revenue,
-            Profit_TZS: financeStats.profit,
-            Expenses_TZS: financeStats.expenses
+            ID: 'TOTAL_SUMMARY',
+            Total_Amount: financeStats.revenue,
+            Profit: financeStats.profit
         });
     } else if (activeTab === 'inventory') {
         // Build flat inventory list from props
@@ -210,17 +252,17 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory }) => {
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                         <p className="text-sm font-medium text-slate-500 mb-1">Total Revenue</p>
                         <h3 className="text-3xl font-bold text-slate-800">{(financeStats.revenue/1000000).toFixed(1)}M <span className="text-sm text-slate-400 font-normal">TZS</span></h3>
-                        <div className="mt-2 text-xs text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-1 rounded">+12% vs last month</div>
+                        <div className="mt-2 text-xs text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-1 rounded">Real-time</div>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                         <p className="text-sm font-medium text-slate-500 mb-1">Gross Profit</p>
                         <h3 className="text-3xl font-bold text-slate-800">{(financeStats.profit/1000000).toFixed(1)}M <span className="text-sm text-slate-400 font-normal">TZS</span></h3>
-                        <div className="mt-2 text-xs text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-1 rounded">Margin: {((financeStats.profit/financeStats.revenue)*100).toFixed(1)}%</div>
+                        <div className="mt-2 text-xs text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-1 rounded">Margin: {(financeStats.revenue > 0 ? (financeStats.profit/financeStats.revenue)*100 : 0).toFixed(1)}%</div>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                         <p className="text-sm font-medium text-slate-500 mb-1">Op. Expenses</p>
                         <h3 className="text-3xl font-bold text-slate-800">{(financeStats.expenses/1000000).toFixed(1)}M <span className="text-sm text-slate-400 font-normal">TZS</span></h3>
-                        <div className="mt-2 text-xs text-rose-600 font-bold bg-rose-50 inline-block px-2 py-1 rounded">+5% increase</div>
+                        <div className="mt-2 text-xs text-rose-600 font-bold bg-rose-50 inline-block px-2 py-1 rounded">Recorded</div>
                     </div>
                 </div>
 
@@ -230,7 +272,7 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory }) => {
                         <h4 className="font-bold text-slate-800 mb-6">Revenue Trend (7 Days)</h4>
                         <div className="h-72">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={salesData}>
+                                <AreaChart data={chartData}>
                                     <defs>
                                         <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#0d9488" stopOpacity={0.1}/>
@@ -322,7 +364,7 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory }) => {
                             <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
                                 <div>
                                     <p className="text-sm text-slate-500">Total Stock Value</p>
-                                    <p className="text-xl font-bold text-slate-800">45,200,000 TZS</p>
+                                    <p className="text-xl font-bold text-slate-800">{valuationStats.toLocaleString()} TZS</p>
                                 </div>
                                 <div className="h-10 w-10 bg-white rounded-full flex items-center justify-center shadow-sm text-teal-600">
                                     <Activity size={20} />

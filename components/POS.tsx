@@ -1,43 +1,49 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon } from 'lucide-react';
-import { Product, CartItem, PaymentMethod, BranchInventoryItem, Sale } from '../types';
+import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon, Send, FileText, X, AlertTriangle } from 'lucide-react';
+import { Product, CartItem, PaymentMethod, BranchInventoryItem, Invoice } from '../types';
 import { checkDrugInteractions } from '../services/geminiService';
 import { BRANCHES, PRODUCTS } from '../data/mockData';
 
 interface POSProps {
   currentBranchId: string;
   inventory: Record<string, BranchInventoryItem[]>;
-  setInventory: React.Dispatch<React.SetStateAction<Record<string, BranchInventoryItem[]>>>;
-  onRecordSale: (sale: Sale) => void;
+  onCreateInvoice: (invoice: Invoice) => void;
 }
 
-const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onRecordSale }) => {
+const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [quickQty, setQuickQty] = useState<number>(1);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [customerName, setCustomerName] = useState('');
   const [interactionWarning, setInteractionWarning] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
 
   // Merge Products with Branch Specific Inventory (LIVE from Props)
+  // CRITICAL UPDATE: Only sum up batches where status === 'ACTIVE'
   const availableProducts: Product[] = PRODUCTS.map(p => {
     const branchStockList = inventory[currentBranchId] || [];
     const inventoryItem = branchStockList.find(i => i.productId === p.id);
     const customPrice = inventoryItem?.customPrice;
 
+    const activeStock = inventoryItem 
+        ? inventoryItem.batches.filter(b => b.status === 'ACTIVE').reduce((sum, b) => sum + b.quantity, 0)
+        : 0;
+
     return {
       ...p,
       price: customPrice || p.price, // Override with custom price if exists
-      totalStock: inventoryItem ? inventoryItem.quantity : 0 // Show ONLY approved stock
+      totalStock: activeStock // Show ONLY approved/ACTIVE stock
     };
   });
 
   // Calculate totals
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const totalCost = cart.reduce((sum, item) => sum + (item.costPrice * item.quantity), 0);
   const vat = subtotal * 0.18; // Tanzania VAT 18%
   const total = subtotal + vat;
 
@@ -59,27 +65,37 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
   }, [cart]);
 
   const addToCart = (product: Product) => {
+    const qtyToAdd = quickQty > 0 ? quickQty : 1;
+
     // Check if enough stock
     const currentQtyInCart = cart.find(i => i.id === product.id)?.quantity || 0;
-    if (currentQtyInCart + 1 > product.totalStock) {
-        alert("Insufficient stock in inventory.");
+    
+    if (currentQtyInCart + qtyToAdd > product.totalStock) {
+        setErrorMsg(`Insufficient stock for ${product.name}. Available: ${product.totalStock}, Requested: ${currentQtyInCart + qtyToAdd}`);
+        setTimeout(() => setErrorMsg(null), 4000);
         return;
     }
 
     setCart(prev => {
       const existing = prev.find(p => p.id === product.id);
       if (existing) {
-        return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p);
+        return prev.map(p => p.id === product.id ? { ...p, quantity: p.quantity + qtyToAdd } : p);
       }
-      return [...prev, { ...product, quantity: 1, selectedBatch: 'BATCH-AUTO', discount: 0 }];
+      return [...prev, { ...product, quantity: qtyToAdd, selectedBatch: 'BATCH-AUTO', discount: 0 }];
     });
+
+    // Reset Quick Qty to 1 for safety after add
+    setQuickQty(1);
+    setErrorMsg(null);
   };
 
   const removeFromCart = (id: string) => {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const updateQuantity = (id: string, delta: number) => {
+  const updateQuantity = (id: string, newQty: number) => {
+    if (isNaN(newQty) || newQty < 0) return;
+    
     setCart(prev => {
         const item = prev.find(i => i.id === id);
         if (!item) return prev;
@@ -88,71 +104,45 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
         const product = availableProducts.find(p => p.id === id);
         if (!product) return prev;
 
-        const newQty = item.quantity + delta;
-
         if (newQty > product.totalStock) {
-            alert("Cannot add more. Exceeds available stock.");
+            setErrorMsg(`Insufficient stock for ${product.name}. Limit is ${product.totalStock} units.`);
+            setTimeout(() => setErrorMsg(null), 4000);
             return prev;
         }
 
-        if (newQty < 1) return prev; // Use remove button for deletion
+        if (newQty === 0) return prev.filter(i => i.id !== id);
 
         return prev.map(p => p.id === id ? { ...p, quantity: newQty } : p);
     });
   };
 
-  const handleCheckout = (method: PaymentMethod) => {
-    setPaymentModalOpen(false);
+  const handleGenerateProforma = () => {
+    if (!customerName) {
+        setErrorMsg("Please enter a customer name for the Proforma Invoice.");
+        setTimeout(() => setErrorMsg(null), 3000);
+        return;
+    }
 
-    // 1. Create Sale Record
-    const sale: Sale = {
-        id: `SALE-${Date.now()}`,
-        date: new Date().toISOString(),
+    const invoice: Invoice = {
+        id: `INV-${Date.now().toString().slice(-6)}`,
         branchId: currentBranchId,
-        items: cart,
+        customerName: customerName,
+        dateIssued: new Date().toISOString().split('T')[0],
+        dueDate: new Date().toISOString().split('T')[0],
         totalAmount: total,
-        totalCost: totalCost,
-        profit: subtotal - totalCost, // Net Profit (Excluding VAT)
-        paymentMethod: method,
-        status: 'COMPLETED'
+        paidAmount: 0,
+        status: 'UNPAID',
+        description: `POS Sale - ${cart.length} items`,
+        source: 'POS',
+        items: cart,
+        payments: []
     };
 
-    onRecordSale(sale);
-
-    // 2. Deduct from Global Inventory
-    setInventory(prev => {
-        const branchStock = [...(prev[currentBranchId] || [])];
-        
-        cart.forEach(cartItem => {
-            const index = branchStock.findIndex(i => i.productId === cartItem.id);
-            if (index !== -1) {
-                // Deduct total quantity
-                branchStock[index].quantity = Math.max(0, branchStock[index].quantity - cartItem.quantity);
-                
-                // Deduct from batches (FIFO Logic - simplified)
-                let remainingToDeduct = cartItem.quantity;
-                const updatedBatches = branchStock[index].batches.map(batch => {
-                     if (remainingToDeduct <= 0) return batch;
-                     
-                     if (batch.quantity >= remainingToDeduct) {
-                         const newBatchQty = batch.quantity - remainingToDeduct;
-                         remainingToDeduct = 0;
-                         return { ...batch, quantity: newBatchQty };
-                     } else {
-                         remainingToDeduct -= batch.quantity;
-                         return { ...batch, quantity: 0 };
-                     }
-                }).filter(b => b.quantity > 0); // Remove empty batches
-
-                branchStock[index].batches = updatedBatches;
-            }
-        });
-
-        return { ...prev, [currentBranchId]: branchStock };
-    });
-
-    setSuccessMsg(`Sale Completed! Profit: ${(subtotal - totalCost).toLocaleString()} TZS. TRA Receipt Generated.`);
+    onCreateInvoice(invoice);
+    setCustomerModalOpen(false);
+    setSuccessMsg(`Proforma Invoice #${invoice.id} sent to Finance. Client should proceed to payment.`);
     setCart([]);
+    setCustomerName('');
     setTimeout(() => setSuccessMsg(''), 5000);
   };
 
@@ -180,7 +170,7 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
     <div className="flex h-[calc(100vh-8rem)] gap-6">
       {/* Product Selection */}
       <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex gap-4">
+        <div className="p-4 border-b border-slate-100 flex gap-4 items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input 
@@ -191,6 +181,18 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
               onChange={(e) => setSearchTerm(e.target.value)}
               autoFocus
             />
+          </div>
+          <div className="w-32">
+             <div className="relative">
+                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold uppercase">Qty:</span>
+                 <input 
+                    type="number" 
+                    min="1"
+                    className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 font-bold text-center"
+                    value={quickQty}
+                    onChange={(e) => setQuickQty(parseInt(e.target.value) || 0)}
+                 />
+             </div>
           </div>
         </div>
 
@@ -222,12 +224,19 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
 
       {/* Cart & Checkout */}
       <div className="w-96 flex flex-col bg-white rounded-2xl shadow-xl border border-slate-100">
-        <div className="p-6 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
-          <h2 className="text-xl font-bold text-slate-800 flex items-center">
-            <Printer className="mr-2" size={20}/>
-            Current Sale
-          </h2>
-          <p className="text-xs text-teal-600 font-bold mt-1">Location: {branchName}</p>
+        <div className="p-6 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <FileText className="mr-2" size={20}/>
+                Order
+            </h2>
+            <p className="text-xs text-teal-600 font-bold mt-1">Location: {branchName}</p>
+          </div>
+          {cart.length > 0 && (
+              <button onClick={() => setCart([])} className="text-slate-400 hover:text-rose-500" title="Clear Cart">
+                  <X size={20} />
+              </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -242,17 +251,23 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h4 className="font-bold text-slate-800 text-sm">{item.name}</h4>
-                    <p className="text-xs text-slate-500">{item.price.toLocaleString()} x {item.quantity}</p>
+                    <p className="text-xs text-slate-500">{item.price.toLocaleString()} per unit</p>
                   </div>
                   <span className="font-bold text-slate-900">{(item.price * item.quantity).toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                     <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-white rounded shadow-sm"><Minus size={14}/></button>
-                     <span className="text-sm font-medium w-4 text-center">{item.quantity}</span>
-                     <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-white rounded shadow-sm"><Plus size={14}/></button>
+                   <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+                     <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 hover:bg-slate-100 rounded text-slate-500"><Minus size={14}/></button>
+                     <input 
+                        type="number"
+                        min="1"
+                        className="w-12 text-center text-sm font-bold border-none focus:ring-0 p-0"
+                        value={item.quantity}
+                        onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 0)}
+                     />
+                     <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 hover:bg-slate-100 rounded text-slate-500"><Plus size={14}/></button>
                    </div>
-                   <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                   <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 p-2"><Trash2 size={16}/></button>
                 </div>
               </div>
             ))
@@ -288,30 +303,42 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
           
           <button 
             disabled={cart.length === 0}
-            onClick={() => setPaymentModalOpen(true)}
-            className="w-full py-4 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-teal-600/20 transition-all flex justify-center items-center gap-2"
+            onClick={() => setCustomerModalOpen(true)}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all flex justify-center items-center gap-2"
           >
-            Process Payment
+             <Send size={18} /> Send to Finance
           </button>
+          <p className="text-xs text-center text-slate-500 mt-2">Inventory will be deducted after payment.</p>
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {paymentModalOpen && (
+      {/* Customer Name Modal */}
+      {customerModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-              <div className="p-6 border-b border-slate-100">
-                 <h3 className="text-xl font-bold text-slate-900">Select Payment Method</h3>
-                 <p className="text-slate-500 text-sm">Total Due: <span className="font-bold text-teal-600">{total.toLocaleString()} TZS</span></p>
+           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+              <div className="p-6 border-b border-slate-100 text-center">
+                 <h3 className="text-xl font-bold text-slate-900">Order Details</h3>
+                 <p className="text-slate-500 text-sm">Create Proforma Invoice for Finance</p>
               </div>
-              <div className="p-6 grid grid-cols-2 gap-4">
-                 <PaymentButton icon={Banknote} label="Cash" onClick={() => handleCheckout(PaymentMethod.CASH)} />
-                 <PaymentButton icon={CreditCard} label="M-Pesa / Tigo" sub="Mobile Money" onClick={() => handleCheckout(PaymentMethod.MOBILE_MONEY)} />
-                 <PaymentButton icon={ShieldCheck} label="NHIF / AAR" sub="Insurance" onClick={() => handleCheckout(PaymentMethod.INSURANCE)} />
-                 <PaymentButton icon={CreditCard} label="Credit" sub="Corporate" onClick={() => handleCheckout(PaymentMethod.CREDIT)} />
+              <div className="p-6">
+                 <label className="block text-sm font-bold text-slate-700 mb-2">Customer Name</label>
+                 <input 
+                   type="text" 
+                   autoFocus
+                   placeholder="e.g. Walk-in Client, John Doe"
+                   className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                   value={customerName}
+                   onChange={e => setCustomerName(e.target.value)}
+                 />
               </div>
-              <div className="p-4 bg-slate-50 text-center">
-                 <button onClick={() => setPaymentModalOpen(false)} className="text-slate-500 hover:text-slate-700 font-medium">Cancel</button>
+              <div className="p-6 bg-slate-50 flex justify-end gap-3">
+                 <button onClick={() => setCustomerModalOpen(false)} className="px-4 py-2 text-slate-500 font-medium">Cancel</button>
+                 <button 
+                    onClick={handleGenerateProforma} 
+                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md"
+                 >
+                    Confirm & Send
+                 </button>
               </div>
            </div>
         </div>
@@ -319,25 +346,28 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, setInventory, onR
 
       {/* Success Toast */}
       {successMsg && (
-        <div className="fixed bottom-8 right-8 bg-teal-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300">
+        <div className="fixed bottom-8 right-8 bg-teal-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300 z-50">
            <CheckCircle className="text-teal-400" />
            <div>
-             <h4 className="font-bold">Success</h4>
+             <h4 className="font-bold">Sent to Finance</h4>
              <p className="text-sm text-teal-100">{successMsg}</p>
+           </div>
+        </div>
+      )}
+
+      {/* Error Toast */}
+      {errorMsg && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-rose-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 fade-in duration-300 z-50">
+           <AlertTriangle className="text-white" />
+           <div>
+             <h4 className="font-bold">Stock Alert</h4>
+             <p className="text-sm text-rose-100">{errorMsg}</p>
            </div>
         </div>
       )}
     </div>
   );
 };
-
-const PaymentButton = ({ icon: Icon, label, sub, onClick }: any) => (
-  <button onClick={onClick} className="flex flex-col items-center justify-center p-6 border border-slate-200 rounded-xl hover:bg-teal-50 hover:border-teal-500 transition-all">
-    <Icon size={32} className="text-teal-600 mb-2" />
-    <span className="font-bold text-slate-800">{label}</span>
-    {sub && <span className="text-xs text-slate-400">{sub}</span>}
-  </button>
-)
 
 const ShoppingCartIcon = ({size, className}: any) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
