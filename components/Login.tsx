@@ -1,148 +1,188 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Shield, 
-  Store, 
-  Stethoscope, 
-  ShoppingCart, 
-  Package, 
+  Lock, 
+  User, 
   ArrowRight,
-  Unlock,
-  Building,
-  Users
+  AlertTriangle,
+  Loader2,
+  CheckCircle
 } from 'lucide-react';
-import { Staff, UserRole } from '../types';
-import { STAFF_LIST, BRANCHES } from '../data/mockData';
+import { Staff } from '../types';
+import { STAFF_LIST } from '../data/mockData';
 
 interface LoginProps {
   onLogin: (user: Staff) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleQuickLogin = (role: UserRole, branchId: string) => {
-    // Find a matching user from the mock list
-    const user = STAFF_LIST.find(u => u.role === role && u.branchId === branchId);
-    
-    if (user) {
-      onLogin(user);
-    } else {
-      // Fallback if specific user not found in mock data
-      const fallbackUser: Staff = {
-          id: 'TEMP-USER',
-          name: 'Demo User',
-          role: role,
-          branchId: branchId,
-          email: 'demo@pms.co.tz',
-          phone: '',
-          status: 'ACTIVE',
-          joinedDate: new Date().toISOString().split('T')[0],
-          username: 'demo',
-          password: ''
-      };
-      onLogin(fallbackUser);
-    }
-  };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
 
-  const PersonaCard = ({ title, role, branchId, icon: Icon, color, desc }: any) => {
-      const branchName = BRANCHES.find(b => b.id === branchId)?.name || 'Head Office';
-      return (
-        <button 
-          onClick={() => handleQuickLogin(role, branchId)}
-          className="flex flex-col items-start text-left p-5 bg-white border border-slate-200 rounded-xl hover:border-teal-500 hover:shadow-md hover:shadow-teal-600/10 transition-all group w-full"
-        >
-          <div className={`p-3 rounded-full mb-3 ${color} group-hover:scale-110 transition-transform`}>
-            <Icon size={24} />
-          </div>
-          <h3 className="font-bold text-slate-800 text-lg">{title}</h3>
-          <div className="flex items-center gap-1 text-xs font-bold text-slate-500 uppercase tracking-wide mt-1 mb-2">
-            {branchId === 'HEAD_OFFICE' ? <Building size={12} /> : <Store size={12} />}
-            {branchName}
-          </div>
-          <p className="text-sm text-slate-500 leading-snug">{desc}</p>
-          <div className="mt-4 flex items-center text-teal-600 text-sm font-bold group-hover:underline">
-            Access System <ArrowRight size={16} className="ml-1" />
-          </div>
-        </button>
+    // Simulate network delay for realism
+    setTimeout(() => {
+      // Find user in mock database
+      const user = STAFF_LIST.find(
+        u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
       );
+
+      if (user) {
+        if (user.status === 'INACTIVE') {
+          setError('Account is disabled. Contact Administrator.');
+          setIsLoading(false);
+          return;
+        }
+
+        setShowSuccess(true);
+        setTimeout(() => {
+            onLogin(user);
+        }, 800);
+      } else {
+        setError('Invalid username or password.');
+        setIsLoading(false);
+      }
+    }, 800);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="max-w-5xl w-full">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Decoration */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
+          <div className="absolute -top-1/2 -left-1/4 w-[1000px] h-[1000px] bg-teal-900/20 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-1/2 -right-1/4 w-[1000px] h-[1000px] bg-blue-900/20 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl flex overflow-hidden z-10 min-h-[600px]">
         
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center p-3 bg-teal-600 rounded-2xl shadow-lg shadow-teal-600/20 mb-4">
-             <Unlock className="text-white" size={32} />
-          </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">PMS Quick Access</h1>
-          <p className="text-slate-500 text-lg max-w-2xl mx-auto">
-            Select a role below to enter the system. <br />
-            <span className="text-sm bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">DEMO MODE ACTIVE</span> - No password required.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          {/* Head Office / Admin */}
-          <div className="lg:col-span-1">
-             <h4 className="font-bold text-slate-400 uppercase text-xs tracking-wider mb-4 ml-1">Administration</h4>
-             <PersonaCard 
-               title="Super Admin"
-               role={UserRole.SUPER_ADMIN}
-               branchId="HEAD_OFFICE"
-               icon={Shield}
-               color="bg-purple-100 text-purple-600"
-               desc="Full access to all branches, settings, reports, and approvals."
-             />
-          </div>
-
-          {/* Branch Operations */}
-          <div className="lg:col-span-2">
-             <h4 className="font-bold text-slate-400 uppercase text-xs tracking-wider mb-4 ml-1">Branch Operations (Kariakoo & Masaki)</h4>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <PersonaCard 
-                  title="Branch Manager"
-                  role={UserRole.BRANCH_MANAGER}
-                  branchId="BR001"
-                  icon={Store}
-                  color="bg-blue-100 text-blue-600"
-                  desc="Manage staff, stock, and oversee operations for Kariakoo branch."
-                />
-                <PersonaCard 
-                  title="Pharmacist (Clinical)"
-                  role={UserRole.PHARMACIST}
-                  branchId="BR002"
-                  icon={Stethoscope}
-                  color="bg-teal-100 text-teal-600"
-                  desc="Handle prescriptions, patient records, and clinical checks."
-                />
-                <PersonaCard 
-                  title="Cashier (POS)"
-                  role={UserRole.CASHIER}
-                  branchId="BR001"
-                  icon={ShoppingCart}
-                  color="bg-emerald-100 text-emerald-600"
-                  desc="Process sales, handle payments, and issue receipts."
-                />
-                <PersonaCard 
-                  title="Inventory Controller"
-                  role={UserRole.INVENTORY_CONTROLLER}
-                  branchId="BR002"
-                  icon={Package}
-                  color="bg-amber-100 text-amber-600"
-                  desc="Receive shipments, verify stock, and manage batch expiries."
-                />
-             </div>
-          </div>
-        </div>
-
-        <div className="mt-12 text-center text-slate-400 text-sm">
-           <div className="flex items-center justify-center gap-2 mb-2">
-              <Users size={16} />
-              <span>Multi-User Session Simulation</span>
+        {/* Left Side - Hero / Branding */}
+        <div className="hidden md:flex w-1/2 bg-gradient-to-br from-teal-800 to-slate-900 p-12 flex-col justify-between text-white relative">
+           <div className="relative z-10">
+               <div className="inline-flex items-center gap-3 mb-6">
+                   <div className="p-3 bg-teal-500/20 rounded-xl backdrop-blur-sm border border-teal-500/30">
+                       <Shield size={32} className="text-teal-400" />
+                   </div>
+                   <h1 className="text-3xl font-bold tracking-tight">PMS<span className="text-teal-400">.</span></h1>
+               </div>
+               <h2 className="text-4xl font-bold leading-tight mb-6">
+                   World-Class <br/> 
+                   <span className="text-teal-400">Pharmacy</span> <br/>
+                   Management.
+               </h2>
+               <p className="text-slate-300 text-lg leading-relaxed">
+                   Secure, scalable, and intelligent system for multi-branch operations.
+               </p>
            </div>
-           <p>Switching roles mimics logging out and logging back in as a different employee.</p>
+           
+           <div className="relative z-10 space-y-4">
+               <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
+                   <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 font-bold">
+                       AI
+                   </div>
+                   <div>
+                       <p className="font-bold text-sm">Smart Clinical Alerts</p>
+                       <p className="text-xs text-slate-400">Powered by Gemini AI</p>
+                   </div>
+               </div>
+               <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
+                   <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold">
+                       HO
+                   </div>
+                   <div>
+                       <p className="font-bold text-sm">Centralized Control</p>
+                       <p className="text-xs text-slate-400">Head Office Dashboard</p>
+                   </div>
+               </div>
+           </div>
+
+           {/* Decorative Grid */}
+           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-soft-light"></div>
+        </div>
+
+        {/* Right Side - Login Form */}
+        <div className="w-full md:w-1/2 p-12 flex flex-col justify-center bg-white">
+           <div className="max-w-sm mx-auto w-full">
+               <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h2>
+               <p className="text-slate-500 mb-8">Please sign in to your account.</p>
+
+               <form onSubmit={handleSubmit} className="space-y-5">
+                   <div>
+                       <label className="block text-sm font-bold text-slate-700 mb-2">Username</label>
+                       <div className="relative group">
+                           <User className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-teal-600 transition-colors" size={20} />
+                           <input 
+                             type="text" 
+                             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all font-medium"
+                             placeholder="Enter your username"
+                             value={username}
+                             onChange={(e) => setUsername(e.target.value)}
+                             required
+                           />
+                       </div>
+                   </div>
+
+                   <div>
+                       <label className="block text-sm font-bold text-slate-700 mb-2">Password</label>
+                       <div className="relative group">
+                           <Lock className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-teal-600 transition-colors" size={20} />
+                           <input 
+                             type="password" 
+                             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all font-medium"
+                             placeholder="••••••••"
+                             value={password}
+                             onChange={(e) => setPassword(e.target.value)}
+                             required
+                           />
+                       </div>
+                   </div>
+
+                   {error && (
+                       <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600 text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                           <AlertTriangle size={18} className="shrink-0" />
+                           {error}
+                       </div>
+                   )}
+
+                   <button 
+                     type="submit" 
+                     disabled={isLoading || showSuccess}
+                     className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
+                        showSuccess 
+                        ? 'bg-emerald-500 text-white shadow-emerald-500/30' 
+                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20'
+                     }`}
+                   >
+                       {isLoading ? (
+                           <Loader2 className="animate-spin" />
+                       ) : showSuccess ? (
+                           <> <CheckCircle className="animate-bounce" /> Success! </>
+                       ) : (
+                           <> Sign In <ArrowRight size={20} /> </>
+                       )}
+                   </button>
+               </form>
+
+               <div className="mt-8 pt-8 border-t border-slate-100 text-center">
+                   <p className="text-xs text-slate-400">
+                       Protected by reCAPTCHA and subject to the Privacy Policy and Terms of Service.
+                   </p>
+               </div>
+               
+               {/* Quick Tip for Demo Users */}
+               <div className="mt-4 text-center">
+                   <p className="text-xs text-slate-400 bg-slate-50 inline-block px-3 py-1 rounded-full border border-slate-100">
+                       Demo: User <strong>admin</strong> | Pass <strong>123</strong>
+                   </p>
+               </div>
+           </div>
         </div>
 
       </div>

@@ -1,18 +1,18 @@
 
 import React, { useMemo } from 'react';
 import { 
-  BarChart, 
-  Bar, 
+  LineChart,
+  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  AreaChart,
+  Area
 } from 'recharts';
 import { TrendingUp, AlertTriangle, DollarSign, Users, Store } from 'lucide-react';
 import { BRANCHES, PRODUCTS } from '../data/mockData';
@@ -188,7 +188,23 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales
           </h3>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChartComponent data={chartData} />
+              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0d9488" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `${value/1000}k`} />
+                <Tooltip 
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    itemStyle={{ color: '#0f766e', fontWeight: 600 }}
+                    formatter={(value: number) => [`TZS ${value.toLocaleString()}`, 'Revenue']}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#0d9488" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={3} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -287,23 +303,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales
       </div>
     </div>
   );
-};
-
-// Helper for chart
-const AreaChartComponent = ({ data }: { data: any[] }) => {
-    return (
-        <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `${value/1000}k`} />
-            <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                itemStyle={{ color: '#0f766e', fontWeight: 600 }}
-                formatter={(value: number) => [`TZS ${value.toLocaleString()}`, 'Revenue']}
-            />
-            <Line type="monotone" dataKey="revenue" stroke="#0d9488" strokeWidth={3} activeDot={{ r: 8 }} dot={false} />
-        </LineChart>
-    );
 };
 
 export default Dashboard;

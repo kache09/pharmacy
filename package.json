@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "recharts": "^2.12.7",
-    "lucide-react": "^0.395.0",
+    "recharts": "2.13.0",
+    "lucide-react": "0.454.0",
     "@google/genai": "^1.30.0",
     "react-dom": "^19.2.1",
     "react": "^19.2.1"
