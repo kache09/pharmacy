@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   Package, 
@@ -29,7 +30,8 @@ import {
   Lock,
   Unlock,
   CheckCircle,
-  Skull
+  Skull,
+  RotateCcw
 } from 'lucide-react';
 import { BRANCHES, PRODUCTS } from '../data/mockData';
 import { StockTransfer, Product, UserRole, BranchInventoryItem, StockReleaseRequest, BatchStatus, StockRequisition, Staff, DisposalRequest } from '../types';
@@ -115,6 +117,12 @@ const Inventory: React.FC<InventoryProps> = ({
 
   const [priceUpdate, setPriceUpdate] = useState({
       newPrice: ''
+  });
+
+  const [adjustData, setAdjustData] = useState({ 
+      type: 'Correction', 
+      quantity: '0', 
+      reason: '' 
   });
 
   // Shipment / Request Form State
@@ -244,13 +252,85 @@ const Inventory: React.FC<InventoryProps> = ({
 
   const openAdjustModal = (item: ExtendedProduct) => {
       setSelectedItem(item);
+      setAdjustData({ type: 'Correction', quantity: '0', reason: '' });
       setShowAdjustModal(true);
+  };
+
+  const handleAdjustStock = () => {
+      if (!selectedItem || !adjustData.quantity) return;
+      const qty = parseInt(adjustData.quantity);
+      if (isNaN(qty) || qty === 0) return;
+
+      setInventory(prev => {
+          const branchStock = [...(prev[currentBranchId] || [])];
+          const itemIndex = branchStock.findIndex(i => i.productId === selectedItem.id);
+          
+          if (itemIndex >= 0) {
+              // Adjust first active batch for simplicity in mock
+              const batchIndex = branchStock[itemIndex].batches.findIndex(b => b.status === 'ACTIVE');
+              if (batchIndex >= 0) {
+                  const newQty = branchStock[itemIndex].batches[batchIndex].quantity + qty;
+                  branchStock[itemIndex].batches[batchIndex].quantity = Math.max(0, newQty);
+              } else if (qty > 0) {
+                 // Create dummy batch if none exists and adding
+                 branchStock[itemIndex].batches.push({
+                     batchNumber: 'ADJ-' + Date.now().toString().slice(-4),
+                     expiryDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+                     quantity: qty,
+                     status: 'ACTIVE'
+                 });
+              }
+              // Update total
+              branchStock[itemIndex].quantity = branchStock[itemIndex].batches.reduce((sum, b) => sum + b.quantity, 0);
+          }
+          return { ...prev, [currentBranchId]: branchStock };
+      });
+      setShowAdjustModal(false);
   };
 
   const openPriceModal = (item: ExtendedProduct) => {
       setSelectedItem(item);
       setPriceUpdate({ newPrice: (item.customPrice || item.price).toString() });
       setShowPriceModal(true);
+  };
+
+  const handleUpdatePrice = () => {
+      if (!selectedItem || !priceUpdate.newPrice) return;
+      const price = parseFloat(priceUpdate.newPrice);
+      
+      setInventory(prev => {
+          const branchStock = [...(prev[currentBranchId] || [])];
+          const itemIndex = branchStock.findIndex(i => i.productId === selectedItem.id);
+          
+          if (itemIndex >= 0) {
+              branchStock[itemIndex].customPrice = price;
+          } else {
+              // If item doesn't exist in branch inventory list yet, add it
+              branchStock.push({
+                  productId: selectedItem.id,
+                  quantity: 0,
+                  batches: [],
+                  customPrice: price
+              });
+          }
+          return { ...prev, [currentBranchId]: branchStock };
+      });
+      setShowPriceModal(false);
+  };
+
+  const handleReorder = (item: ExtendedProduct) => {
+      setNewShipment({
+          targetBranchId: '',
+          notes: 'Reorder for ' + item.name,
+          items: [{
+              productId: item.id,
+              productName: item.name,
+              batchNumber: '', 
+              expiryDate: '',
+              quantity: Math.max(item.minStockLevel * 2, 50)
+          }]
+      });
+      setShowRequestModal(true);
   };
 
   const handleViewLog = (item: ExtendedProduct) => {
@@ -654,17 +734,26 @@ const Inventory: React.FC<InventoryProps> = ({
                                 </button>
                             ) : (
                                 <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => openAdjustModal(product)}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 text-xs transition-colors shadow-sm text-center flex-1"
+                                        >
+                                            Adjust Stock
+                                        </button>
+                                        <button 
+                                            onClick={() => openPriceModal(product)}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-xs transition-colors shadow-sm text-center flex items-center justify-center gap-1"
+                                            title="Set Price"
+                                        >
+                                            <Tag size={12} />
+                                        </button>
+                                    </div>
                                     <button 
-                                        onClick={() => openAdjustModal(product)}
-                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 text-xs transition-colors shadow-sm text-center"
+                                        onClick={() => handleReorder(product)}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-xs transition-colors shadow-sm text-center flex items-center justify-center gap-1"
                                     >
-                                        Adjust Stock
-                                    </button>
-                                    <button 
-                                        onClick={() => openPriceModal(product)}
-                                        className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-xs transition-colors shadow-sm text-center flex items-center justify-center gap-1"
-                                    >
-                                        <Tag size={12} /> Set Price
+                                        <RotateCcw size={12} /> Reorder
                                     </button>
                                 </div>
                             )}
@@ -1085,6 +1174,100 @@ const Inventory: React.FC<InventoryProps> = ({
                   <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
                       <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
                       <button onClick={handleSaveStock} className="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700">Save to Inventory</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Adjust Stock Modal */}
+      {showAdjustModal && selectedItem && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                      <h3 className="text-xl font-bold text-slate-900">Adjust Stock</h3>
+                      <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                  </div>
+                  
+                  <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                      <p className="font-bold text-slate-800">{selectedItem.name}</p>
+                      <p className="text-sm text-slate-500">Current Active Stock: {selectedItem.totalStock}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Adjustment Type</label>
+                          <select 
+                            className="w-full p-2 border border-slate-300 rounded-lg"
+                            value={adjustData.type}
+                            onChange={(e) => setAdjustData({...adjustData, type: e.target.value})}
+                          >
+                              <option value="Correction">Correction (+/-)</option>
+                              <option value="Damaged">Damaged (Remove)</option>
+                              <option value="Theft">Theft/Lost (Remove)</option>
+                              <option value="Return">Customer Return (Add)</option>
+                          </select>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Quantity Change</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-3 border border-slate-300 rounded-lg font-bold"
+                            placeholder="+/- Qty"
+                            value={adjustData.quantity}
+                            onChange={(e) => setAdjustData({...adjustData, quantity: e.target.value})}
+                          />
+                          <p className="text-xs text-slate-400 mt-1">Use negative values to remove stock (e.g. -5)</p>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Reason / Note</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-2 border border-slate-300 rounded-lg"
+                            placeholder="Brief explanation..."
+                            value={adjustData.reason}
+                            onChange={(e) => setAdjustData({...adjustData, reason: e.target.value})}
+                          />
+                      </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3">
+                      <button onClick={() => setShowAdjustModal(false)} className="px-4 py-2 text-slate-600">Cancel</button>
+                      <button onClick={handleAdjustStock} className="px-4 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700">Confirm Adjustment</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Set Price Modal */}
+      {showPriceModal && selectedItem && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                      <h3 className="text-xl font-bold text-slate-900">Set Custom Price</h3>
+                      <button onClick={() => setShowPriceModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                  </div>
+                  
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <p className="font-bold text-blue-900">{selectedItem.name}</p>
+                      <p className="text-xs text-blue-700">Base Global Price: {selectedItem.price.toLocaleString()} TZS</p>
+                  </div>
+
+                  <div className="space-y-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Branch Selling Price (TZS)</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-3 border border-slate-300 rounded-lg font-bold text-lg"
+                            placeholder="0.00"
+                            value={priceUpdate.newPrice}
+                            onChange={(e) => setPriceUpdate({ newPrice: e.target.value })}
+                          />
+                      </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3">
+                      <button onClick={() => setShowPriceModal(false)} className="px-4 py-2 text-slate-600">Cancel</button>
+                      <button onClick={handleUpdatePrice} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Update Price</button>
                   </div>
               </div>
           </div>
