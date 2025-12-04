@@ -15,6 +15,7 @@ import Settings from './components/Settings';
 import Approvals from './components/Approvals';
 import { Staff as StaffType, UserRole, BranchInventoryItem, StockTransfer, Sale, Invoice, CartItem, PaymentMethod, StockReleaseRequest, StockRequisition, DisposalRequest, Expense, Branch } from './types';
 import { BRANCH_INVENTORY, STOCK_TRANSFERS, MOCK_INVOICES, MOCK_REQUISITIONS, INITIAL_EXPENSES, MOCK_SALES, BRANCHES } from './data/mockData';
+import { api } from './services/apiService';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<StaffType | null>(null);
@@ -63,6 +64,36 @@ const App: React.FC = () => {
     };
 
     checkExpiry();
+    
+    // Load backend data if available
+    const loadBackendData = async () => {
+      try {
+        const inventoryResult = await api.getInventory();
+        if (inventoryResult.success && Array.isArray(inventoryResult.data)) {
+          console.log('Loaded inventory from backend:', inventoryResult.data);
+          // Map backend response to local state format
+          const backendInventory: Record<string, BranchInventoryItem[]> = {};
+          inventoryResult.data.forEach((item: any) => {
+            if (!backendInventory[item.branchId]) {
+              backendInventory[item.branchId] = [];
+            }
+            backendInventory[item.branchId].push({
+              productId: item.productId,
+              quantity: item.quantity,
+              batches: Array.isArray(item.batches) ? item.batches : [],
+              customPrice: item.customPrice,
+            });
+          });
+          if (Object.keys(backendInventory).length > 0) {
+            setInventory(backendInventory);
+          }
+        }
+      } catch (err) {
+        console.log('Backend unavailable, using mock data');
+      }
+    };
+    
+    loadBackendData();
   }, []); // Run once on mount
 
   // Handle Login

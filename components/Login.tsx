@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Staff } from '../types';
 import { STAFF_LIST } from '../data/mockData';
+import { api } from '../services/apiService';
 
 interface LoginProps {
   onLogin: (user: Staff) => void;
@@ -23,34 +24,51 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulate network delay for realism
-    setTimeout(() => {
-      // Find user in mock database
-      const user = STAFF_LIST.find(
+    try {
+      const result = await api.login(username, password);
+      
+      if (result.success && result.data.user) {
+        const user: Staff = {
+          id: result.data.user.id,
+          username: result.data.user.username,
+          name: result.data.user.name,
+          password: '',
+          role: result.data.user.role as any,
+          branchId: result.data.user.branchId || 'HEAD_OFFICE',
+          status: result.data.user.status,
+        };
+        setShowSuccess(true);
+        setTimeout(() => onLogin(user), 800);
+      } else {
+        const mockUser = STAFF_LIST.find(
+          u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
+        );
+        if (mockUser && mockUser.status === 'ACTIVE') {
+          setShowSuccess(true);
+          setTimeout(() => onLogin(mockUser), 800);
+        } else {
+          setError(result.error || 'Invalid username or password.');
+          setIsLoading(false);
+        }
+      }
+    } catch (err) {
+      setError('Connection error. Using local auth.');
+      const mockUser = STAFF_LIST.find(
         u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
       );
-
-      if (user) {
-        if (user.status === 'INACTIVE') {
-          setError('Account is disabled. Contact Administrator.');
-          setIsLoading(false);
-          return;
-        }
-
+      if (mockUser && mockUser.status === 'ACTIVE') {
         setShowSuccess(true);
-        setTimeout(() => {
-            onLogin(user);
-        }, 800);
+        setTimeout(() => onLogin(mockUser), 800);
       } else {
-        setError('Invalid username or password.');
+        setError('Invalid credentials.');
         setIsLoading(false);
       }
-    }, 800);
+    }
   };
 
   return (
@@ -179,7 +197,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                {/* Quick Tip for Demo Users */}
                <div className="mt-4 text-center">
                    <p className="text-xs text-slate-400 bg-slate-50 inline-block px-3 py-1 rounded-full border border-slate-100">
-                       Demo: User <strong>admin</strong> | Pass <strong>123</strong>
+                       Demo: <strong>admin</strong> / <strong>123</strong> (Backend or Mock)
                    </p>
                </div>
            </div>
