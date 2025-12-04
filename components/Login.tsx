@@ -61,7 +61,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="absolute -bottom-1/2 -right-1/4 w-[1000px] h-[1000px] bg-blue-900/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl flex overflow-hidden z-10 min-h-[600px]">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex overflow-hidden z-10 min-h-[520px]">
         
         {/* Left Side - Hero / Branding */}
         <div className="hidden md:flex w-1/2 bg-gradient-to-br from-teal-800 to-slate-900 p-12 flex-col justify-between text-white relative">
@@ -108,7 +108,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="w-full md:w-1/2 p-12 flex flex-col justify-center bg-white">
+        <div className="w-full md:w-1/2 p-8 flex flex-col justify-center bg-white">
            <div className="max-w-sm mx-auto w-full">
                <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h2>
                <p className="text-slate-500 mb-8">Please sign in to your account.</p>
