@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Package, 
   AlertTriangle, 
@@ -59,6 +59,8 @@ interface InventoryProps {
   disposalRequests?: DisposalRequest[];
   onCreateDisposalRequest?: (req: DisposalRequest) => void;
   onFinalizeDisposal?: (req: DisposalRequest) => void;
+    prefillReorder?: { productId: string; productName?: string } | null;
+    onConsumePrefill?: () => void;
 }
 
 const Inventory: React.FC<InventoryProps> = ({ 
@@ -74,11 +76,26 @@ const Inventory: React.FC<InventoryProps> = ({
     disposalRequests = [],
     onCreateDisposalRequest,
     onFinalizeDisposal
+    , prefillReorder = null, onConsumePrefill
 }) => {
   const [activeTab, setActiveTab] = useState<'stock' | 'transfers' | 'control'>('stock');
   
   // Local State for Products (Mocking database of products)
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+
+    // If parent requested a reorder prefill (from Dashboard), open reorder flow
+    useEffect(() => {
+        if (prefillReorder && prefillReorder.productId) {
+            const prod = products.find(p => p.id === prefillReorder.productId);
+            if (prod) {
+                // Use existing handler to open the reorder modal with suggested qty
+                handleReorder(prod);
+                // Tell parent we've consumed the prefill so it can clear state
+                if (onConsumePrefill) onConsumePrefill();
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [prefillReorder]);
 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);

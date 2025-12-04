@@ -73,9 +73,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                    <h1 className="text-3xl font-bold tracking-tight">PMS<span className="text-teal-400">.</span></h1>
                </div>
                <h2 className="text-4xl font-bold leading-tight mb-6">
-                   World-Class <br/> 
+                    <br/> 
                    <span className="text-teal-400">Pharmacy</span> <br/>
-                   Management.
+                   Management System.
                </h2>
                <p className="text-slate-300 text-lg leading-relaxed">
                    Secure, scalable, and intelligent system for multi-branch operations.
@@ -85,11 +85,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
            <div className="relative z-10 space-y-4">
                <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
                    <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 font-bold">
-                       AI
+                        KH
                    </div>
                    <div>
-                       <p className="font-bold text-sm">Smart Clinical Alerts</p>
-                       <p className="text-xs text-slate-400">Powered by Gemini AI</p>
+                       <p className="font-bold text-sm">Tech solutions made easy</p>
+                       <p className="text-xs text-slate-400">Powered by Kachehub</p>
                    </div>
                </div>
                <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
@@ -170,11 +170,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                    </button>
                </form>
 
-               <div className="mt-8 pt-8 border-t border-slate-100 text-center">
+               {/* <div className="mt-8 pt-8 border-t border-slate-100 text-center">
                    <p className="text-xs text-slate-400">
                        Protected by reCAPTCHA and subject to the Privacy Policy and Terms of Service.
                    </p>
-               </div>
+               </div> */}
                
                {/* Quick Tip for Demo Users */}
                <div className="mt-4 text-center">

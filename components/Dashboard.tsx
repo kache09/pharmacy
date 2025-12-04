@@ -47,9 +47,10 @@ interface DashboardProps {
   sales: Sale[];
   expenses: Expense[];
   onViewInventory: () => void;
+  onReorderItem?: (productId: string, productName: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales, expenses, onViewInventory }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales, expenses, onViewInventory, onReorderItem }) => {
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
   const activeBranchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
 
@@ -294,7 +295,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales
                       <td className="px-6 py-4">{item.branch}</td>
                       <td className="px-6 py-4 text-red-600 font-bold">{item.stock} Units</td>
                       <td className="px-6 py-4"><span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">LOW</span></td>
-                      <td className="px-6 py-4 text-teal-600 hover:text-teal-800 cursor-pointer">Reorder</td>
+                      <td className="px-6 py-4"><button onClick={() => { const product = PRODUCTS.find(p => p.name === item.name); if (product && onReorderItem) onReorderItem(product.id, product.name); }} className="text-teal-600 hover:text-teal-800 cursor-pointer font-medium hover:underline">Reorder</button></td>
                     </tr>
                 ))
             )}

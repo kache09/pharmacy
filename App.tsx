@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<StaffType | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentBranchId, setCurrentBranchId] = useState('HEAD_OFFICE');
+  const [prefillReorder, setPrefillReorder] = useState<{productId: string; productName?: string} | null>(null);
 
   // Global State for Data Consistency
   const [inventory, setInventory] = useState<Record<string, BranchInventoryItem[]>>(BRANCH_INVENTORY);
@@ -78,6 +79,13 @@ const App: React.FC = () => {
     else if (user.role === UserRole.PHARMACIST) setActiveTab('clinical');
     else if (user.role === UserRole.ACCOUNTANT) setActiveTab('finance');
     else setActiveTab('dashboard');
+  };
+
+  
+  const handleReorderItem = (productId: string, productName: string) => {
+    // Open the Inventory tab and pass the product to prefill a reorder request
+    setPrefillReorder({ productId, productName });
+    setActiveTab('inventory');
   };
 
   const handleLogout = () => {
@@ -306,7 +314,7 @@ const App: React.FC = () => {
             inventory={inventory} 
             sales={sales}
             expenses={expenses}
-            onViewInventory={() => setActiveTab('inventory')} 
+            onViewInventory={() => setActiveTab('inventory')} onReorderItem={handleReorderItem} 
           />
         );
       case 'approvals':
@@ -345,6 +353,8 @@ const App: React.FC = () => {
             disposalRequests={disposalRequests}
             onCreateDisposalRequest={handleCreateDisposalRequest}
             onFinalizeDisposal={handleFinalizeDisposal}
+            prefillReorder={prefillReorder}
+            onConsumePrefill={() => setPrefillReorder(null)}
           />
         );
       case 'finance':
@@ -375,7 +385,7 @@ const App: React.FC = () => {
             inventory={inventory} 
             sales={sales}
             expenses={expenses}
-            onViewInventory={() => setActiveTab('inventory')} 
+            onViewInventory={() => setActiveTab('inventory')} onReorderItem={handleReorderItem} 
           />
         );
     }
