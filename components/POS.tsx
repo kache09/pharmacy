@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Trash2, Plus, Minus, CreditCard, Banknote, ShieldCheck, Printer, CheckCircle, AlertOctagon, Send, FileText, X, AlertTriangle, Eye, ArrowLeft, ArrowRight } from 'lucide-react';
-import { Product, CartItem, PaymentMethod, BranchInventoryItem, Invoice } from '../types';
+import { Product, CartItem, PaymentMethod, BranchInventoryItem, Invoice, Branch } from '../types';
 import { checkDrugInteractions } from '../services/geminiService';
-import { BRANCHES, PRODUCTS } from '../data/mockData';
 
 interface POSProps {
   currentBranchId: string;
   inventory: Record<string, BranchInventoryItem[]>;
   onCreateInvoice: (invoice: Invoice) => void;
+  products?: Product[];
+  branches?: Branch[];
 }
 
-const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }) => {
+const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice, products = [], branches = [] }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [quickQty, setQuickQty] = useState<number>(1);
@@ -23,11 +24,11 @@ const POS: React.FC<POSProps> = ({ currentBranchId, inventory, onCreateInvoice }
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
-  const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+  const branchName = branches.find(b => b.id === currentBranchId)?.name;
 
   // Merge Products with Branch Specific Inventory (LIVE from Props)
   // CRITICAL UPDATE: Only sum up batches where status === 'ACTIVE'
-  const availableProducts: Product[] = PRODUCTS.map(p => {
+  const availableProducts: Product[] = products.map(p => {
     const branchStockList = inventory[currentBranchId] || [];
     const inventoryItem = branchStockList.find(i => i.productId === p.id);
     const customPrice = inventoryItem?.customPrice;

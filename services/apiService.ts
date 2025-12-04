@@ -74,6 +74,10 @@ export const api = {
     return apiCall(`/inventory${query}`);
   },
 
+  // Products & Branches
+  getProducts: () => apiCall('/products'),
+  getBranches: () => apiCall('/branches'),
+
   // Orders & Requisitions
   listRequisitions: () => apiCall('/orders/requisitions'),
   createRequisition: (data: any) => apiCall('/orders/requisition', 'POST', data),

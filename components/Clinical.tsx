@@ -14,11 +14,11 @@ import {
   ArrowRight,
   Brain
 } from 'lucide-react';
-import { MOCK_PATIENTS, MOCK_PRESCRIPTIONS, BRANCHES } from '../data/mockData';
-import { Patient, Prescription } from '../types';
+import { MOCK_PATIENTS, MOCK_PRESCRIPTIONS } from '../data/mockData';
+import { Patient, Prescription, Branch } from '../types';
 import { digitizePrescription } from '../services/geminiService';
 
-const Clinical: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
+const Clinical: React.FC<{currentBranchId: string; branches?: Branch[]}> = ({ currentBranchId, branches = [] }) => {
   const [activeTab, setActiveTab] = useState<'patients' | 'rx' | 'tools'>('patients');
   const [patients, setPatients] = useState<Patient[]>(MOCK_PATIENTS);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>(MOCK_PRESCRIPTIONS);
@@ -34,7 +34,7 @@ const Clinical: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const [calcResult, setCalcResult] = useState<string | null>(null);
 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
-  const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+  const branchName = branches.find(b => b.id === currentBranchId)?.name;
 
   const filteredPatients = patients.filter(p => 
     (isHeadOffice || p.branchId === currentBranchId) && 

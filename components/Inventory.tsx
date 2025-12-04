@@ -33,8 +33,7 @@ import {
   Skull,
   RotateCcw
 } from 'lucide-react';
-import { BRANCHES, PRODUCTS } from '../data/mockData';
-import { StockTransfer, Product, UserRole, BranchInventoryItem, StockReleaseRequest, BatchStatus, StockRequisition, Staff, DisposalRequest } from '../types';
+import { StockTransfer, Product, UserRole, BranchInventoryItem, StockReleaseRequest, BatchStatus, StockRequisition, Staff, DisposalRequest, Branch } from '../types';
 
 interface ExtendedProduct extends Product {
   customPrice?: number;
@@ -59,8 +58,10 @@ interface InventoryProps {
   disposalRequests?: DisposalRequest[];
   onCreateDisposalRequest?: (req: DisposalRequest) => void;
   onFinalizeDisposal?: (req: DisposalRequest) => void;
-    prefillReorder?: { productId: string; productName?: string } | null;
-    onConsumePrefill?: () => void;
+        prefillReorder?: { productId: string; productName?: string } | null;
+        onConsumePrefill?: () => void;
+        products?: Product[];
+        branches?: Branch[];
 }
 
 const Inventory: React.FC<InventoryProps> = ({ 
@@ -75,25 +76,26 @@ const Inventory: React.FC<InventoryProps> = ({
     currentUser,
     disposalRequests = [],
     onCreateDisposalRequest,
-    onFinalizeDisposal
-    , prefillReorder = null, onConsumePrefill
+    onFinalizeDisposal,
+    prefillReorder = null, onConsumePrefill,
+    products = [], branches = []
 }) => {
   const [activeTab, setActiveTab] = useState<'stock' | 'transfers' | 'control'>('stock');
   
-  // Local State for Products (Mocking database of products)
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+    // Products come from props (backend) or fallback mock passed from parent
+    const [localProducts, setLocalProducts] = useState<Product[]>(products);
 
     // If parent requested a reorder prefill (from Dashboard), open reorder flow
     useEffect(() => {
         if (prefillReorder && prefillReorder.productId) {
-            const prod = products.find(p => p.id === prefillReorder.productId);
-            if (prod) {
-                // Use existing handler to open the reorder modal with suggested qty
-                handleReorder(prod);
-                // Tell parent we've consumed the prefill so it can clear state
-                if (onConsumePrefill) onConsumePrefill();
+                const prod = localProducts.find(p => p.id === prefillReorder.productId);
+                if (prod) {
+                    // Use existing handler to open the reorder modal with suggested qty
+                    handleReorder(prod);
+                    // Tell parent we've consumed the prefill so it can clear state
+                    if (onConsumePrefill) onConsumePrefill();
+                }
             }
-        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prefillReorder]);
 
@@ -159,11 +161,11 @@ const Inventory: React.FC<InventoryProps> = ({
       quantity: ''
   });
   
-  const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
-  const activeBranchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+    const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
+    const activeBranchName = branches.find(b => b.id === currentBranchId)?.name;
 
   // Logic to merge Product Definitions with Branch Inventory Levels
-  const displayedInventory: ExtendedProduct[] = products.map(product => {
+    const displayedInventory: ExtendedProduct[] = localProducts.map(product => {
     let totalStock = 0;
     let batches: any[] = [];
     let customPrice: number | undefined = undefined;
@@ -213,7 +215,7 @@ const Inventory: React.FC<InventoryProps> = ({
   const totalAssetValue = displayedInventory.reduce((acc, curr) => acc + (curr.totalStock * curr.costPrice), 0);
   const totalPotentialRevenue = displayedInventory.reduce((acc, curr) => acc + (curr.totalStock * (curr.customPrice || curr.price)), 0);
 
-  const branchTransfers = transfers.filter(t => 
+    const branchTransfers = transfers.filter(t => 
     isHeadOffice ? true : t.targetBranchId === currentBranchId || t.sourceBranchId === currentBranchId
   );
 
@@ -226,9 +228,9 @@ const Inventory: React.FC<InventoryProps> = ({
     let targetProductId = newStock.productId;
     // Logic for new product creation simplified for mock
     if (newStock.isNewProduct) {
-        const newId = (products.length + 1).toString();
+        const newId = (localProducts.length + 1).toString();
         // @ts-ignore
-        setProducts([...products, { ...newStock, id: newId, costPrice: parseFloat(newStock.costPrice), price: parseFloat(newStock.price), minStockLevel: 10, totalStock: 0, requiresPrescription: false, batches: [] }]);
+        setLocalProducts([...localProducts, { ...newStock, id: newId, costPrice: parseFloat(newStock.costPrice), price: parseFloat(newStock.price), minStockLevel: 10, totalStock: 0, requiresPrescription: false, batches: [] }]);
         targetProductId = newId;
     }
 
@@ -425,7 +427,7 @@ const Inventory: React.FC<InventoryProps> = ({
 
   const addShipmentItem = () => {
       if(!shipmentItem.productId || !shipmentItem.quantity) return;
-      const product = products.find(p => p.id === shipmentItem.productId);
+      const product = localProducts.find(p => p.id === shipmentItem.productId);
       if(!product) return;
 
       setNewShipment(prev => ({
@@ -999,9 +1001,9 @@ const Inventory: React.FC<InventoryProps> = ({
                                              {isReadyForController && <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">PENDING VERIFICATION</span>}
                                          </h3>
                                          <p className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-                                             <span>From: <strong>{BRANCHES.find(b=>b.id === transfer.sourceBranchId)?.name}</strong></span>
+                                             <span>From: <strong>{branches.find(b=>b.id === transfer.sourceBranchId)?.name}</strong></span>
                                              <ArrowRight size={14}/>
-                                             <span>To: <strong>{BRANCHES.find(b=>b.id === transfer.targetBranchId)?.name}</strong></span>
+                                             <span>To: <strong>{branches.find(b=>b.id === transfer.targetBranchId)?.name}</strong></span>
                                              <span className="mx-2">•</span>
                                              <span>{transfer.dateSent}</span>
                                          </p>
@@ -1167,7 +1169,7 @@ const Inventory: React.FC<InventoryProps> = ({
                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select Product</label>
                            <select className="w-full p-2 border border-slate-300 rounded-lg text-sm" value={newStock.productId} onChange={(e) => setNewStock({...newStock, productId: e.target.value})}>
                                <option value="">-- Choose Product --</option>
-                               {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.genericName})</option>)}
+                               {localProducts.map(p => <option key={p.id} value={p.id}>{p.name} ({p.genericName})</option>)}
                            </select>
                       </div>
                       <div>
@@ -1316,7 +1318,7 @@ const Inventory: React.FC<InventoryProps> = ({
                             onChange={(e) => setNewShipment({...newShipment, targetBranchId: e.target.value})}
                           >
                               <option value="">-- Select Target Branch --</option>
-                              {BRANCHES.filter(b => b.id !== 'HEAD_OFFICE' && b.status === 'ACTIVE').map(b => (
+                              {branches.filter(b => b.id !== 'HEAD_OFFICE' && b.status === 'ACTIVE').map(b => (
                                   <option key={b.id} value={b.id}>{b.name} ({b.location})</option>
                               ))}
                           </select>
@@ -1334,7 +1336,7 @@ const Inventory: React.FC<InventoryProps> = ({
                                     onChange={(e) => setShipmentItem({...shipmentItem, productId: e.target.value})}
                                   >
                                       <option value="">Product...</option>
-                                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                      {localProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                   </select>
                               </div>
                               <div className="col-span-3">

@@ -8,8 +8,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, Receipt,
   FileText, Plus, X, Printer, Store, Wallet, Building, CheckCircle, FilePlus, User, Eye
 } from 'lucide-react';
-import { BRANCHES } from '../data/mockData';
-import { Invoice, PaymentMethod, Expense, Sale } from '../types';
+import { Invoice, PaymentMethod, Expense, Sale, Branch } from '../types';
 
 const PAYMENT_METHODS_DATA = [
   { name: 'Cash', value: 4500000 },
@@ -27,9 +26,10 @@ interface FinanceProps {
     sales: Sale[];
     onProcessPayment: (invoice: Invoice) => void;
     onCreateExpense: (expense: Expense) => void;
+    branches?: Branch[];
 }
 
-const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, sales, onProcessPayment, onCreateExpense }) => {
+const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, sales, onProcessPayment, onCreateExpense, branches = [] }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'expenses' | 'tax'>('overview');
   
   // Modal State
@@ -183,7 +183,7 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
         <div>
           <h2 className="text-3xl font-bold text-slate-900">Finance & Accounting</h2>
           <p className="text-slate-500 mt-1">
-             {isHeadOffice ? 'Global Financial Overview' : `Financials for ${BRANCHES.find(b => b.id === currentBranchId)?.name}`}
+             {isHeadOffice ? 'Global Financial Overview' : `Financials for ${branches.find(b => b.id === currentBranchId)?.name}`}
           </p>
         </div>
         <div className="flex gap-2 no-print">
@@ -406,7 +406,7 @@ const Finance: React.FC<FinanceProps> = ({ currentBranchId, invoices, expenses, 
                             <tr key={exp.id} className="hover:bg-slate-50">
                                 <td className="px-6 py-4 font-medium text-slate-800">{exp.description}</td>
                                 <td className="px-6 py-4 text-sm text-slate-600">{exp.category}</td>
-                                <td className="px-6 py-4 text-xs text-slate-500">{BRANCHES.find(b => b.id === exp.branchId)?.name}</td>
+                                <td className="px-6 py-4 text-xs text-slate-500">{branches.find(b => b.id === exp.branchId)?.name}</td>
                                 <td className="px-6 py-4 font-bold text-slate-800">TZS {exp.amount.toLocaleString()}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${

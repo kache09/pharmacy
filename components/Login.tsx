@@ -41,6 +41,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           role: result.data.user.role as any,
           branchId: result.data.user.branchId || 'HEAD_OFFICE',
           status: result.data.user.status,
+          email: result.data.user.email || '',
+          phone: result.data.user.phone || '',
+          joinedDate: result.data.user.joinedDate || new Date().toISOString(),
         };
         setShowSuccess(true);
         setTimeout(() => onLogin(user), 800);
@@ -79,10 +82,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="absolute -bottom-1/2 -right-1/4 w-[1000px] h-[1000px] bg-blue-900/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex overflow-hidden z-10 min-h-[520px]">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex overflow-hidden z-10 min-h-[420px]">
         
         {/* Left Side - Hero / Branding */}
-        <div className="hidden md:flex w-1/2 bg-gradient-to-br from-teal-800 to-slate-900 p-12 flex-col justify-between text-white relative">
+        <div className="hidden md:flex w-1/2 bg-gradient-to-br from-teal-800 to-slate-900 p-8 flex-col justify-between text-white relative">
            <div className="relative z-10">
                <div className="inline-flex items-center gap-3 mb-6">
                    <div className="p-3 bg-teal-500/20 rounded-xl backdrop-blur-sm border border-teal-500/30">
@@ -165,7 +168,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                    {error && (
                        <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600 text-sm font-medium animate-in fade-in slide-in-from-top-2">
                            <AlertTriangle size={18} className="shrink-0" />
-                           {error}
+                                 <span className="no-underline">{error}</span>
                        </div>
                    )}
 
@@ -196,9 +199,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                
                {/* Quick Tip for Demo Users */}
                <div className="mt-4 text-center">
-                   <p className="text-xs text-slate-400 bg-slate-50 inline-block px-3 py-1 rounded-full border border-slate-100">
+                     <p className="text-xs text-slate-400 bg-slate-50 inline-block px-3 py-1 rounded-full border border-slate-100 no-underline">
                        Demo: <strong>admin</strong> / <strong>123</strong> (Backend or Mock)
-                   </p>
+                     </p>
                </div>
            </div>
         </div>

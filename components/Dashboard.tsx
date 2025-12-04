@@ -15,7 +15,7 @@ import {
   Area
 } from 'recharts';
 import { TrendingUp, AlertTriangle, DollarSign, Users, Store } from 'lucide-react';
-import { BRANCHES, PRODUCTS } from '../data/mockData';
+import { Product, Branch } from '../types';
 import { BranchInventoryItem, Sale, Expense } from '../types';
 
 const COLORS = ['#0f766e', '#14b8a6', '#5eead4', '#ccfbf1'];
@@ -48,11 +48,13 @@ interface DashboardProps {
   expenses: Expense[];
   onViewInventory: () => void;
   onReorderItem?: (productId: string, productName: string) => void;
+  products?: Product[];
+  branches?: Branch[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales, expenses, onViewInventory, onReorderItem }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales, expenses, onViewInventory, onReorderItem, products = [], branches = [] }) => {
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
-  const activeBranchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+  const activeBranchName = branches.find(b => b.id === currentBranchId)?.name;
 
   // DYNAMIC CALCULATIONS
   const dashboardStats = useMemo(() => {
@@ -102,10 +104,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales
           branchRevenueMap[s.branchId] = (branchRevenueMap[s.branchId] || 0) + s.totalAmount;
       });
 
-      return Object.entries(branchRevenueMap).map(([bId, val]) => ({
-          name: BRANCHES.find(b => b.id === bId)?.name || bId,
+        return Object.entries(branchRevenueMap).map(([bId, val]) => ({
+          name: branches.find(b => b.id === bId)?.name || bId,
           value: val
-      }));
+        }));
   }, [sales, isHeadOffice]);
 
 
@@ -117,7 +119,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales
   branchesToCheck.forEach(bId => {
       const stockList = inventory[bId] || [];
       stockList.forEach(item => {
-          const productDef = PRODUCTS.find(p => p.id === item.productId);
+          const productDef = products.find(p => p.id === item.productId);
           // Calculate ACTIVE stock only
           const activeStock = item.batches.filter(b => b.status === 'ACTIVE').reduce((sum, b) => sum + b.quantity, 0);
 
@@ -125,9 +127,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales
               lowStockCount++;
               if (criticalItems.length < 5) {
                   criticalItems.push({
-                      name: productDef.name,
-                      stock: activeStock,
-                      branch: BRANCHES.find(b => b.id === bId)?.name || bId
+                        name: productDef.name,
+                        stock: activeStock,
+                        branch: branches.find(b => b.id === bId)?.name || bId
                   });
               }
           }
@@ -295,7 +297,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentBranchId, inventory, sales
                       <td className="px-6 py-4">{item.branch}</td>
                       <td className="px-6 py-4 text-red-600 font-bold">{item.stock} Units</td>
                       <td className="px-6 py-4"><span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">LOW</span></td>
-                      <td className="px-6 py-4"><button onClick={() => { const product = PRODUCTS.find(p => p.name === item.name); if (product && onReorderItem) onReorderItem(product.id, product.name); }} className="text-teal-600 hover:text-teal-800 cursor-pointer font-medium hover:underline">Reorder</button></td>
+                      <td className="px-6 py-4"><button onClick={() => { const product = products.find(p => p.name === item.name); if (product && onReorderItem) onReorderItem(product.id, product.name); }} className="text-teal-600 hover:text-teal-800 cursor-pointer font-medium hover:underline">Reorder</button></td>
                     </tr>
                 ))
             )}

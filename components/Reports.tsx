@@ -18,12 +18,10 @@ import {
   FileBarChart
 } from 'lucide-react';
 import { 
-  BRANCHES, 
-  MOCK_AUDIT_LOGS,
-  CATEGORY_PERFORMANCE,
-  PRODUCTS
+    MOCK_AUDIT_LOGS,
+    CATEGORY_PERFORMANCE,
 } from '../data/mockData';
-import { AuditLog, BranchInventoryItem, Sale, Expense } from '../types';
+import { AuditLog, BranchInventoryItem, Sale, Expense, Product, Branch } from '../types';
 
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#f43f5e', '#64748b'];
 
@@ -32,14 +30,16 @@ interface ReportsProps {
   inventory: Record<string, BranchInventoryItem[]>;
   sales: Sale[];
   expenses: Expense[];
+    products?: Product[];
+    branches?: Branch[];
 }
 
-const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory, sales, expenses }) => {
+const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory, sales, expenses, products = [], branches = [] }) => {
   const [activeTab, setActiveTab] = useState<'finance' | 'inventory' | 'audit'>('finance');
   const [auditFilter, setAuditFilter] = useState('');
   
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
-  const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+    const branchName = branches.find(b => b.id === currentBranchId)?.name;
 
   // DYNAMIC FILTERING
   const filteredSales = useMemo(() => isHeadOffice ? sales : sales.filter(s => s.branchId === currentBranchId), [sales, currentBranchId, isHeadOffice]);
@@ -75,13 +75,13 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory, sales, ex
      let totalVal = 0;
      const branchesToCheck = isHeadOffice ? Object.keys(inventory) : [currentBranchId];
      branchesToCheck.forEach(bId => {
-         const items = inventory[bId] || [];
-         items.forEach(i => {
-             const product = PRODUCTS.find(p => p.id === i.productId);
-             if (product) {
-                 totalVal += i.quantity * product.costPrice;
-             }
-         });
+             const items = inventory[bId] || [];
+             items.forEach(item => {
+                 const product = products.find(p => p.id === item.productId);
+                 if (product) {
+                     totalVal += item.quantity * product.costPrice;
+                 }
+             });
      });
      return totalVal;
   }, [inventory, currentBranchId, isHeadOffice]);
@@ -136,14 +136,14 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory, sales, ex
     const dateStr = new Date().toISOString().split('T')[0];
     const filename = `PMS_${activeTab}_Report_${branchName?.replace(/\s+/g, '_')}_${dateStr}.csv`;
 
-    if (activeTab === 'finance') {
+        if (activeTab === 'finance') {
         dataToExport = filteredSales.map((s: Sale) => ({
             ID: s.id,
             Date: s.date, 
             Total_Amount: s.totalAmount,
             Profit: s.profit,
             Payment_Method: s.paymentMethod,
-            Branch: BRANCHES.find(b => b.id === s.branchId)?.name || s.branchId
+                Branch: branches.find(b => b.id === s.branchId)?.name || s.branchId
         }));
         // Append summary row
         dataToExport.push({});
@@ -157,10 +157,10 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory, sales, ex
         const branchesToExport = isHeadOffice ? Object.keys(inventory) : [currentBranchId];
         
         branchesToExport.forEach(bId => {
-             const bName = BRANCHES.find(b => b.id === bId)?.name;
+             const bName = branches.find(b => b.id === bId)?.name;
              const items = inventory[bId] || [];
              items.forEach(item => {
-                 const product = PRODUCTS.find(p => p.id === item.productId);
+                 const product = products.find(p => p.id === item.productId);
                  if (product) {
                      dataToExport.push({
                          Branch: bName,
@@ -184,7 +184,7 @@ const Reports: React.FC<ReportsProps> = ({ currentBranchId, inventory, sales, ex
             User: log.userName,
             Action: log.action,
             Details: log.details,
-            Branch: BRANCHES.find(b => b.id === log.branchId)?.name || log.branchId,
+            Branch: branches.find(b => b.id === log.branchId)?.name || log.branchId,
             Severity: log.severity
         }));
     }

@@ -13,8 +13,8 @@ import Clinical from './components/Clinical';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Approvals from './components/Approvals';
-import { Staff as StaffType, UserRole, BranchInventoryItem, StockTransfer, Sale, Invoice, CartItem, PaymentMethod, StockReleaseRequest, StockRequisition, DisposalRequest, Expense, Branch } from './types';
-import { BRANCH_INVENTORY, STOCK_TRANSFERS, MOCK_INVOICES, MOCK_REQUISITIONS, INITIAL_EXPENSES, MOCK_SALES, BRANCHES } from './data/mockData';
+import { Staff as StaffType, UserRole, BranchInventoryItem, StockTransfer, Sale, Invoice, CartItem, PaymentMethod, StockReleaseRequest, StockRequisition, DisposalRequest, Expense, Branch, Product } from './types';
+import { BRANCH_INVENTORY, STOCK_TRANSFERS, MOCK_INVOICES, MOCK_REQUISITIONS, INITIAL_EXPENSES, MOCK_SALES, BRANCHES as MOCK_BRANCHES, PRODUCTS as MOCK_PRODUCTS } from './data/mockData';
 import { api } from './services/apiService';
 
 const App: React.FC = () => {
@@ -32,7 +32,8 @@ const App: React.FC = () => {
   const [releaseRequests, setReleaseRequests] = useState<StockReleaseRequest[]>([]);
   const [requisitions, setRequisitions] = useState<StockRequisition[]>(MOCK_REQUISITIONS);
   const [disposalRequests, setDisposalRequests] = useState<DisposalRequest[]>([]);
-  const [branches, setBranches] = useState<Branch[]>(BRANCHES);
+  const [branches, setBranches] = useState<Branch[]>(MOCK_BRANCHES);
+  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
 
   // Automatic Expiry Check on Load
   useEffect(() => {
@@ -87,6 +88,17 @@ const App: React.FC = () => {
           if (Object.keys(backendInventory).length > 0) {
             setInventory(backendInventory);
           }
+        }
+        // Load products
+        const prodRes = await api.getProducts();
+        if (prodRes.success && Array.isArray(prodRes.data)) {
+          setProducts(prodRes.data);
+        }
+
+        // Load branches
+        const branchRes = await api.getBranches();
+        if (branchRes.success && Array.isArray(branchRes.data)) {
+          setBranches(branchRes.data);
         }
       } catch (err) {
         console.log('Backend unavailable, using mock data');
@@ -345,7 +357,9 @@ const App: React.FC = () => {
             inventory={inventory} 
             sales={sales}
             expenses={expenses}
-            onViewInventory={() => setActiveTab('inventory')} onReorderItem={handleReorderItem} 
+            onViewInventory={() => setActiveTab('inventory')} onReorderItem={handleReorderItem}
+            products={products}
+            branches={branches}
           />
         );
       case 'approvals':
@@ -367,6 +381,8 @@ const App: React.FC = () => {
             currentBranchId={currentBranchId} 
             inventory={inventory} 
             onCreateInvoice={handleCreateInvoice}
+            products={products}
+            branches={branches}
           />
         );
       case 'inventory':
@@ -386,6 +402,8 @@ const App: React.FC = () => {
             onFinalizeDisposal={handleFinalizeDisposal}
             prefillReorder={prefillReorder}
             onConsumePrefill={() => setPrefillReorder(null)}
+            products={products}
+            branches={branches}
           />
         );
       case 'finance':
@@ -397,16 +415,17 @@ const App: React.FC = () => {
                 sales={sales}
                 onProcessPayment={handleInvoicePayment}
                 onCreateExpense={handleCreateExpense}
+                branches={branches}
             />
         );
       case 'staff':
-        return <Staff currentBranchId={currentBranchId} />;
+        return <Staff currentBranchId={currentBranchId} branches={branches} />;
       case 'branches':
         return <Branches branches={branches} onUpdateBranches={setBranches} />;
       case 'clinical':
-        return <Clinical currentBranchId={currentBranchId} />;
+        return <Clinical currentBranchId={currentBranchId} branches={branches} />;
       case 'reports':
-        return <Reports currentBranchId={currentBranchId} inventory={inventory} sales={sales} expenses={expenses} />;
+        return <Reports currentBranchId={currentBranchId} inventory={inventory} sales={sales} expenses={expenses} products={products} branches={branches} />;
       case 'settings':
         return <Settings currentBranchId={currentBranchId} />;
       default:
@@ -416,7 +435,9 @@ const App: React.FC = () => {
             inventory={inventory} 
             sales={sales}
             expenses={expenses}
-            onViewInventory={() => setActiveTab('inventory')} onReorderItem={handleReorderItem} 
+            onViewInventory={() => setActiveTab('inventory')} onReorderItem={handleReorderItem}
+            products={products}
+            branches={branches}
           />
         );
     }

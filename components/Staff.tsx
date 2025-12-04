@@ -19,11 +19,11 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { BRANCHES, STAFF_LIST } from '../data/mockData';
-import { Staff as StaffType, UserRole } from '../types';
+import { STAFF_LIST } from '../data/mockData';
+import { Staff as StaffType, UserRole, Branch } from '../types';
 
-const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
-  const [staff, setStaff] = useState<StaffType[]>(STAFF_LIST);
+const Staff: React.FC<{currentBranchId: string; branches?: Branch[]}> = ({ currentBranchId, branches = [] }) => {
+    const [staff, setStaff] = useState<StaffType[]>(STAFF_LIST);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modal States
@@ -46,7 +46,7 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
   const [editingStaff, setEditingStaff] = useState<StaffType | null>(null);
 
   const isHeadOffice = currentBranchId === 'HEAD_OFFICE';
-  const branchName = BRANCHES.find(b => b.id === currentBranchId)?.name;
+    const branchName = branches.find(b => b.id === currentBranchId)?.name;
 
   // Filter Logic
   const filteredStaff = staff.filter(s => {
@@ -205,12 +205,12 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                               <Phone size={16} className="text-slate-400" />
                               <span>{member.phone || 'No Phone'}</span>
                           </div>
-                          <div className="flex items-center gap-3">
-                              <MapPin size={16} className="text-slate-400" />
-                              <span className="text-teal-700 font-medium">
-                                  {BRANCHES.find(b => b.id === member.branchId)?.name || 'Unknown Branch'}
-                              </span>
-                          </div>
+                                        <div className="flex items-center gap-3">
+                                              <MapPin size={16} className="text-slate-400" />
+                                              <span className="text-teal-700 font-medium">
+                                                  {branches.find(b => b.id === member.branchId)?.name || 'Unknown Branch'}
+                                              </span>
+                                          </div>
                       </div>
                   </div>
                   
@@ -305,7 +305,7 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                                 disabled={!isHeadOffice}
                                 onChange={(e) => setNewStaff({...newStaff, branchId: e.target.value})}
                             >
-                                {BRANCHES.map(b => (
+                                {branches.map(b => (
                                     <option key={b.id} value={b.id}>{b.name}</option>
                                 ))}
                             </select>
@@ -462,7 +462,7 @@ const Staff: React.FC<{currentBranchId: string}> = ({ currentBranchId }) => {
                                 value={editingStaff.branchId}
                                 onChange={(e) => setEditingStaff({...editingStaff, branchId: e.target.value})}
                             >
-                                {BRANCHES.map(b => (
+                                {branches.map(b => (
                                     <option key={b.id} value={b.id}>{b.name} ({b.location})</option>
                                 ))}
                             </select>
