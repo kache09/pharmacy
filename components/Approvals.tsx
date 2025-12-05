@@ -12,8 +12,7 @@ import {
   Unlock,
   Trash2
 } from 'lucide-react';
-import { BRANCHES } from '../data/mockData';
-import { Expense, StockRequisition, StockReleaseRequest, DisposalRequest } from '../types';
+import { Expense, StockRequisition, StockReleaseRequest, DisposalRequest, Branch } from '../types';
 
 interface ApprovalsProps {
     releaseRequests?: StockReleaseRequest[];
@@ -24,6 +23,7 @@ interface ApprovalsProps {
     onApproveDisposal?: (req: DisposalRequest) => void;
     expenses?: Expense[];
     onActionExpense?: (id: number, action: 'Approved' | 'Rejected') => void;
+    branches?: Branch[];
 }
 
 const Approvals: React.FC<ApprovalsProps> = ({ 
@@ -34,7 +34,8 @@ const Approvals: React.FC<ApprovalsProps> = ({
     disposalRequests = [],
     onApproveDisposal,
     expenses = [],
-    onActionExpense
+    onActionExpense,
+    branches = []
 }) => {
   const [activeTab, setActiveTab] = useState<'expenses' | 'stock' | 'release' | 'disposal'>('expenses');
   
@@ -119,7 +120,7 @@ const Approvals: React.FC<ApprovalsProps> = ({
                                           </div>
                                       </td>
                                       <td className="px-6 py-4 text-sm font-medium text-slate-700">
-                                          {BRANCHES.find(b => b.id === expense.branchId)?.name}
+                                          {branches.find(b => b.id === expense.branchId)?.name}
                                       </td>
                                       <td className="px-6 py-4">
                                           <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs font-bold">{expense.category}</span>
@@ -175,7 +176,7 @@ const Approvals: React.FC<ApprovalsProps> = ({
                                           </div>
                                           <div>
                                               <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                                  {BRANCHES.find(b => b.id === req.branchId)?.name}
+                                                  {branches.find(b => b.id === req.branchId)?.name}
                                                   {req.priority === 'URGENT' && <span className="text-xs bg-rose-600 text-white px-2 py-0.5 rounded animate-pulse">URGENT</span>}
                                               </h4>
                                               <p className="text-sm text-slate-500 flex items-center gap-2 mt-1">
@@ -244,7 +245,7 @@ const Approvals: React.FC<ApprovalsProps> = ({
                                    <div className="flex justify-between items-start mb-4">
                                        <div>
                                             <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                                {BRANCHES.find(b => b.id === req.branchId)?.name}
+                                                {branches.find(b => b.id === req.branchId)?.name}
                                             </h4>
                                             <p className="text-sm text-slate-500 mt-1">Requested by {req.requestedBy} on {req.date}</p>
                                        </div>
@@ -304,7 +305,7 @@ const Approvals: React.FC<ApprovalsProps> = ({
                                    <div className="flex justify-between items-start mb-4">
                                        <div>
                                             <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                                {BRANCHES.find(b => b.id === req.branchId)?.name}
+                                                {branches.find(b => b.id === req.branchId)?.name}
                                             </h4>
                                             <p className="text-sm text-slate-500 mt-1">Requested by {req.requestedBy} on {req.date}</p>
                                        </div>

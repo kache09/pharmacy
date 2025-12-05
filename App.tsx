@@ -373,6 +373,7 @@ const App: React.FC = () => {
                 onApproveDisposal={handleApproveDisposal}
                 expenses={expenses}
                 onActionExpense={handleExpenseAction}
+                branches={branches}
             />
         );
       case 'pos':

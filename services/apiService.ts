@@ -75,7 +75,7 @@ export const api = {
   },
 
   // Products & Branches
-  getProducts: () => apiCall('/products'),
+  getProducts: () => apiCall('/inventory/products'),
   getBranches: () => apiCall('/branches'),
 
   // Orders & Requisitions
